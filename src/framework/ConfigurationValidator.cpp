@@ -4142,6 +4142,7 @@ static std::string DefaultAPSchema = R"foo(
 }
 
 )foo";
+static std::string DefaultOLGSchema = DefaultAPSchema;
 
 static std::string DefaultSWITCHSchema = R"foo(
 
@@ -8280,6 +8281,7 @@ namespace OpenWifi {
 		if (MicroServiceConfigGetBool("ucentral.datamodel.internal", true)) {
 			SetSchema(ConfigurationType::AP, DefaultAPSchema);
 			SetSchema(ConfigurationType::SWITCH, DefaultSWITCHSchema);
+    		SetSchema(ConfigurationType::OLG, DefaultOLGSchema);
 			poco_information(Logger(), "Using uCentral validation from built-in default.");
 			return;
 		}

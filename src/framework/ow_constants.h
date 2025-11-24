@@ -849,6 +849,7 @@ namespace OpenWifi::Provisioning::DeviceClass {
 namespace OpenWifi::Platforms {
 	static const std::string AP = "ap";
 	static const std::string SWITCH = "switch";
+	static const std::string OLG = "olg";
 }
 
 #if defined(__GNUC__)

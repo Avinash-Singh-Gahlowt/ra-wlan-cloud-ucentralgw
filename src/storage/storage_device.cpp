@@ -1166,7 +1166,8 @@ namespace OpenWifi {
 			std::vector<std::string> ScriptLines{
 				"update devices set devicetype='ap' where devicetype='AP';",
 				"update devices set devicetype='switch' where devicetype='SWITCH';",
-				"update devices set devicetype='ap' where devicetype!='ap' and devicetype!='switch';"
+				"update devices set devicetype='olg' where devicetype='OLG';",
+				"update devices set devicetype='ap' where devicetype!='ap' and devicetype!='switch' and devicetype!='olg' ;"
 			};
 
 			for (const auto &ScriptLine : ScriptLines) {
