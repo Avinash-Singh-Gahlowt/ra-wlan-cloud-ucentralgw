@@ -81,6 +81,7 @@ namespace OpenWifi {
             poco_trace(logger_, "AP_WS_Transport::Shutdown: closing socket");
             ws_->close();
         } catch (...) {
+            poco_error(logger_, "Exception in closing AP_WS_Transport socket");
         }
     }
 

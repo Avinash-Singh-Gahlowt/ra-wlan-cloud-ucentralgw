@@ -447,8 +447,7 @@ namespace OpenWifi {
         if(!InitializedBaseService) {
             InitializedBaseService = true;
             SubSystems_.push_back(KafkaManager());
-//Start InfraKafkaConsumer with the subsystems so CnC_Res topic mesages are handled as the microservice starts.
-			SubSystems_.push_back(InfraKafkaConsumer());
+			SubSystems_.push_back(InfraKafkaConsumer()); //Start InfraKafkaConsumer with the subsystems so CnC_Res topic mesages are handled as the microservice starts.
             SubSystems_.push_back(ALBHealthCheckServer());
             SubSystems_.push_back(RESTAPI_ExtServer());
             SubSystems_.push_back(RESTAPI_IntServer());

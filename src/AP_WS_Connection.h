@@ -228,7 +228,7 @@ namespace OpenWifi {
 		bool	Simulated_=false;
 		std::atomic_uint64_t 	LastContact_=0;
 		bool	Synthetic_=false;
-		std::string groupId_;
+		std::string groupId_{};
 
 		static inline std::atomic_uint64_t ConcurrentStartingDevices_ = 0;
 		bool ForwardTelemetryCommand(uint64_t RPCID, const std::string &serialNumber,const Poco::JSON::Object &params);

@@ -494,9 +494,9 @@ namespace OpenWifi {
 
 	bool CommandManager::SendCommandViaRest([[maybe_unused]] const CommandInfo &info,
 								const std::string &SerialNumber, const std::string &Method,
-								const Poco::JSON::Object::Ptr &RpcPayload,
+								const Poco::JSON::Object::Ptr &payload,
 								std::chrono::milliseconds requestTimeout, bool oneway,
-								Poco::JSON::Object::Ptr &responseOut) {
+								Poco::JSON::Object::Ptr &response) {
 
 			auto groupId = ResolveGroupId(SerialNumber);
 			if (!groupId) {
@@ -505,16 +505,16 @@ namespace OpenWifi {
 				return false;
 			}
 
-			responseOut = nullptr;
+			response = nullptr;
 
 			auto effectiveTimeout = requestTimeout.count() > 0 ? requestTimeout : kCommandRestTimeout;
-			auto sent = SDK::CGW::PostInfraCommand(*groupId, SerialNumber, Method, RpcPayload,
-										effectiveTimeout, oneway, responseOut, Logger());
+			auto sent = SDK::CGW::PostInfraCommand(*groupId, SerialNumber, Method, payload,
+										effectiveTimeout, oneway, response, Logger());
 
-			if (sent && RpcPayload) {
+			if (sent && payload) {
 				try {
 					std::ostringstream txStream;
-					Poco::JSON::Stringifier::stringify(RpcPayload, txStream);
+					Poco::JSON::Stringifier::stringify(payload, txStream);
 					const auto txBytes = txStream.str().size();
 					if (txBytes > 0) {
 						auto serialInt = Utils::SerialNumberToInt(SerialNumber);
@@ -531,11 +531,11 @@ namespace OpenWifi {
 				}
 			}
 
-			if (sent && !oneway && !responseOut.isNull()) {
+			if (sent && !oneway && !response.isNull()) {
 				try {
 					auto serialInt = Utils::SerialNumberToInt(SerialNumber);
 					std::ostringstream rxStream;
-					Poco::JSON::Stringifier::stringify(*responseOut, rxStream);
+					Poco::JSON::Stringifier::stringify(*response, rxStream);
 					const auto rxBytes = rxStream.str().size();
 					if (rxBytes > 0) {
 						if (auto connection = AP_WS_Server()->FindConnection(serialInt)) {
@@ -563,19 +563,22 @@ namespace OpenWifi {
 				auto liveGroupId = connection->GetGroupId();
 				Poco::trimInPlace(liveGroupId);
 				if (!liveGroupId.empty()) {
+					poco_debug(Logger(), fmt::format("Group ID Resolved from cache: {}", SerialNumber));
 					return liveGroupId;
 				}
 			}
-		} catch (...) {
-			// ignore and fall back to storage
-		}
 
-		GWObjects::Device device;
-		if (StorageService()->GetDevice(SerialNumber, device)) {
-    		auto group = device.groupId;
-    		Poco::trimInPlace(group);
-    		if (!group.empty())
-        		return group;
+			GWObjects::Device device;
+			if (StorageService()->GetDevice(SerialNumber, device)) {
+				auto group = device.groupId;
+				Poco::trimInPlace(group);
+				if (!group.empty()){
+					poco_debug(Logger(), fmt::format("Group ID Resolved from DB: {}", SerialNumber));
+					return group;
+				}	
+			}
+		} catch (...) {
+			poco_error(Logger(), fmt::format("Exception: Group ID Resolving Exception: {}", SerialNumber));
 		}
 		return std::nullopt;
 	}

@@ -197,6 +197,7 @@ add_executable( owgw
         src/RADIUS_helpers.h
         src/VenueBroadcaster.h
         src/sdks/sdk_prov.h
+        src/sdks/sdk_cgw.h src/sdks/sdk_cgw.cpp
         src/AP_WS_Process_connect.cpp
         src/AP_WS_Process_state.cpp
         src/AP_WS_Process_healthcheck.cpp

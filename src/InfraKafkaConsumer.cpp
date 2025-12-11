@@ -259,31 +259,25 @@ namespace OpenWifi {
     }
 
     std::string InfraKafkaConsumer::ExtractSerialFromFrame(const Poco::Dynamic::Var &FrameVar) {
- 
-        auto Obj = FrameVar.extract<Poco::JSON::Object::Ptr>();
-        if (Obj->has(uCentralProtocol::PARAMS)) {
-            try {
+        try {
+            auto Obj = FrameVar.extract<Poco::JSON::Object::Ptr>();
+            if (Obj->has(uCentralProtocol::PARAMS)) {
                 auto Params = Obj->getObject(uCentralProtocol::PARAMS);
                 if (Params->has(uCentralProtocol::SERIAL)) {
                     return NormalizeSerial(Params->get(uCentralProtocol::SERIAL).toString());
                 }
-            } catch (...) {
             }
-        }
-        if (Obj->has(uCentralProtocol::SERIAL)) {
-            try {
-                return NormalizeSerial(Obj->get(uCentralProtocol::SERIAL).toString());
-            } catch (...) {
+            if (Obj->has(uCentralProtocol::SERIAL)) {
+                return NormalizeSerial(Obj->get(uCentralProtocol::SERIAL).toString());     
             }
-        }
-        if (Obj->has(uCentralProtocol::RESULT)) {
-            try {
+            if (Obj->has(uCentralProtocol::RESULT)) {
                 auto ResultObj = Obj->get(uCentralProtocol::RESULT).extract<Poco::JSON::Object::Ptr>();
                 if (!ResultObj.isNull() && ResultObj->has(uCentralProtocol::SERIAL)) {
                     return NormalizeSerial(ResultObj->get(uCentralProtocol::SERIAL).toString());
                 }
-            } catch (...) {
             }
+        } catch (const std::exception &e) {
+            poco_error(Poco::Logger::get("INFRA-KAFKA"), fmt::format("Exception parsing payload for generic message to extract serial: {}", e.what()));
         }
         return {};
     }
@@ -293,7 +287,8 @@ namespace OpenWifi {
         Poco::Dynamic::Var Var;
         try {
             Var = Parser.parse(Payload);
-        } catch (...) {
+        } catch (const Poco::Exception &E) {
+            poco_warning(Poco::Logger::get("INFRA-KAFKA"), fmt::format("Exception in InfraKafkaConsumer: invalid payload {}", E.displayText()));
             return {};
         }
         return ExtractSerialFromFrame(Var);
@@ -322,7 +317,7 @@ namespace OpenWifi {
         }
         auto SerialNumber = Utils::SerialNumberToInt(Serial);
         auto Peer = Message->has("infra_public_ip") ? Message->get("infra_public_ip").toString() : std::string{};
-        std::string GroupId;
+        std::string GroupId{};
         if (Message->has("infra_group_id")) {
             try {
                 GroupId = Message->get("infra_group_id").convert<std::string>();

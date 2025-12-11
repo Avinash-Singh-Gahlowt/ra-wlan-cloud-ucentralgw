@@ -199,8 +199,7 @@ namespace OpenWifi {
 		}
 
 		std::string DeviceGroupId = TheDevice.groupId;
-		Poco::trimInPlace(DeviceGroupId);
-		if(DeviceGroupId.empty()||DeviceGroupId=="0"){
+		if( DeviceGroupId.empty() || DeviceGroupId == "0" ){
 			poco_warning(Logger_,
 						 fmt::format("POST-DEVICE-COMMAND: TID={} user={} serial={} missing groupId",
 									 TransactionId_, Requester(), SerialNumber_));
