@@ -24,10 +24,8 @@ namespace OpenWifi::SDK::CGW {
 
 	bool PostInfraCommand(
 		const std::string &groupId, const std::string &serialNumber, const std::string &method,
-		const Poco::JSON::Object::Ptr &payload, std::chrono::milliseconds timeout, bool oneway,
+		const Poco::JSON::Object::Ptr &payload, std::chrono::milliseconds timeout, bool oneway_rpc,
 		Poco::JSON::Object::Ptr &response, Poco::Logger &logger) {
-
-		response = nullptr;
 
 		if (timeout.count() <= 0)
 			timeout = std::chrono::milliseconds(30000);
@@ -44,18 +42,18 @@ namespace OpenWifi::SDK::CGW {
 		auto endpointPath = fmt::format("/api/v1/groups/{}/infra/command", groupId);
 		std::ostringstream serializedBodyStream;
 		Poco::JSON::Stringifier::stringify(body, serializedBodyStream);
-		poco_information(logger,
+		poco_trace(logger,
 				fmt::format("CGW REST POST {} payload={}", endpointPath, serializedBodyStream.str()));
 
 		Poco::JSON::Object::Ptr Res;
 		OpenAPIRequestPost request(
 			uSERVICE_CGWREST, endpointPath, {}, body,
 			static_cast<uint64_t>(timeout.count()),
-			fmt::format("CGW command {} {}", serialNumber, method));
+			fmt::format("CGW POST command {} {}", serialNumber, method));
 		auto status = request.Do(Res);
 		poco_information(logger,
-				fmt::format("CGW REST POST {} status={}", endpointPath,
-						static_cast<int>(status)));
+				fmt::format("CGW REST POST {}, status={} for Method: {}, SerialNumber: {}", endpointPath,
+						static_cast<int>(status), method, serialNumber));
 		if (status < Poco::Net::HTTPResponse::HTTP_OK ||
 			status >= Poco::Net::HTTPResponse::HTTP_MULTIPLE_CHOICES) {
 			poco_warning(logger, fmt::format(
@@ -64,8 +62,10 @@ namespace OpenWifi::SDK::CGW {
 			return false;
 		}
 
-		if (oneway)
+		if (oneway_rpc){
+			poco_information(logger,fmt::format("Command oneway sent, Method: {}, Serial: {}", method, serialNumber));
 			return true;
+		}
 
 		if (Res.isNull()) {
 			poco_warning(logger, fmt::format(
@@ -74,18 +74,24 @@ namespace OpenWifi::SDK::CGW {
 		}
 
 		Poco::Dynamic::Var payloadVar;
-		if (Res->has("received_payload")) {
-			payloadVar = Res->get("received_payload");
+		if (Res->has("payload")) {
+			payloadVar = Res->get("payload");
 		}
 		else {
 			poco_warning(logger, fmt::format(
-				"POST command {} for {} missing received_payload field.", method, serialNumber));
+				"POST command {} for {} missing payload field.", method, serialNumber));
 			return false;
 		}
 
 		try {
 			if (payloadVar.type() == typeid(Poco::JSON::Object::Ptr)) {
 				response = payloadVar.extract<Poco::JSON::Object::Ptr>();
+           		poco_debug(logger, fmt::format("Response for POST CGW-REST /DeviceRequest is: {}", !response.isNull()));
+				return true;
+			}
+			else {
+				poco_information(logger, fmt::format("Invalid type for payload in POST command {} for {}.", method, serialNumber));
+				return false;
 			}
 		} catch (const Poco::Exception &E) {
 			poco_warning(logger, fmt::format(
@@ -98,8 +104,6 @@ namespace OpenWifi::SDK::CGW {
 				E.what()));
 			return false;
 		}
-		poco_debug(logger,fmt::format("Response for POST CGW-REST /DeviceRequest is: {}", !response.isNull()));
-		return !response.isNull();
 	}
 
 } // namespace OpenWifi::SDK::CGW

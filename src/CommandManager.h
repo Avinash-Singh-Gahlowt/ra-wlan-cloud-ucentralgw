@@ -204,9 +204,9 @@ namespace OpenWifi {
 					bool rpc_call, bool Deferred = false,
 					std::chrono::milliseconds requestTimeout = std::chrono::milliseconds{0});
 
-		bool SendCommandViaRest([[maybe_unused]] const CommandInfo &info, const std::string &SerialNumber,
+		bool SendCommand( const std::string &SerialNumber,
 							 const std::string &Method, const Poco::JSON::Object::Ptr &payload,
-							 std::chrono::milliseconds requestTimeout, bool oneway,
+							 std::chrono::milliseconds requestTimeout, bool oneway_rpc,
 							 Poco::JSON::Object::Ptr &response);
 		std::optional<std::string> ResolveGroupId(const std::string &SerialNumber);
 

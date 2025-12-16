@@ -67,24 +67,21 @@ namespace OpenWifi {
         std::atomic_bool WorkersRunning_{false};
         std::atomic_bool Accepting_{false};
         std::size_t WorkerCount_ = 0;
-        std::atomic<std::uint64_t> EnqueuedCount_{0};
-        std::atomic<std::uint64_t> DequeuedCount_{0};
-        std::atomic<std::uint64_t> InfraJoinHandledCount_{0};
 
         InfraKafkaConsumer() noexcept : SubSystemServer("InfraKafkaConsumer", "INFRA-KAFKA", "openwifi.kafka.infra") {}
 
         /**
          * @brief Parses a payload envelope and schedules follow-up processing.
          */
-        void HandleMessage(const std::string &Key, const std::string &Payload);
+        void HandleMessage(const std::string &Payload);
         /**
          * @brief Routes a decoded payload to the appropriate infra handler.
          */
-        void ProcessMessage(const Poco::JSON::Object::Ptr &Message, const std::string &RawPayload);
+        void ProcessMessage(const Poco::JSON::Object::Ptr &Message);
         /**
          * @brief Reacts to infra_join events by wiring up a synthetic websocket session.
          */
-        void HandleJoin(const Poco::JSON::Object::Ptr &Message, const std::string &RawPayload);
+        void HandleJoin(const Poco::JSON::Object::Ptr &Message);
         /**
          * @brief Handles infra_leave events by shutting down any associated synthetic session.
          */
@@ -92,7 +89,7 @@ namespace OpenWifi {
         /**
          * @brief Processes miscellaneous frames destined for an existing synthetic session(state).
          */
-        void HandleGeneric(const Poco::JSON::Object::Ptr &Message, const std::string &RawPayload);
+        void HandleGeneric(const Poco::JSON::Object::Ptr &Message);
 
         /**
          * @brief Normalizes serial strings by removing separators and lowercasing characters.

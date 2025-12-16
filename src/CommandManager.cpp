@@ -439,11 +439,14 @@ namespace OpenWifi {
 			CInfo.State = 1;
 		}
 
-	// Commands targeting synthetic (Kafka-driven) connections still ride the REST bridge before
-	// they reach the device. The call below builds the JSON-RPC envelope, registers a promise so
-	// callers can wait for the returned payload, and forwards evershing to CGW using the same
-	// timeout budget the REST handler provided. Once CGW hands back the device response,
-	// PostCommandResult pushes it onto the in-memory queue so the waiting code path can resume.
+		/*
+		Commands targeting synthetic (Kafka-driven) connections still ride the REST bridge before
+		they reach the device. The call below builds the JSON-RPC envelope, registers a promise so
+		callers can wait for the returned payload, and forwards evershing to CGW using the same
+		timeout budget the REST handler provided. Once CGW hands back the device response,
+		PostCommandResult pushes it onto the in-memory queue so the waiting code path can resume.
+		*/
+
 		Poco::JSON::Object::Ptr CompleteRPC(new Poco::JSON::Object);
 		CompleteRPC->set(uCentralProtocol::JSONRPC, uCentralProtocol::JSONRPC_VERSION);
 		CompleteRPC->set(uCentralProtocol::ID, RPC_ID);
@@ -463,7 +466,7 @@ namespace OpenWifi {
 		}
 
 		Poco::JSON::Object::Ptr deviceResponse;
-		if (SendCommandViaRest(CInfo, SerialNumber, CommandStr, CompleteRPC,
+		if (SendCommand(SerialNumber, CommandStr, CompleteRPC,
 							     requestTimeout, oneway_rpc, deviceResponse)) {
 			poco_debug(Logger(), fmt::format("{}: Sent command. ID: {}", UUID, RPC_ID));
 			Sent = true;
@@ -492,10 +495,9 @@ namespace OpenWifi {
 		return nullptr;
 	}
 
-	bool CommandManager::SendCommandViaRest([[maybe_unused]] const CommandInfo &info,
-								const std::string &SerialNumber, const std::string &Method,
+	bool CommandManager::SendCommand( const std::string &SerialNumber, const std::string &Method,
 								const Poco::JSON::Object::Ptr &payload,
-								std::chrono::milliseconds requestTimeout, bool oneway,
+								std::chrono::milliseconds requestTimeout, bool oneway_rpc,
 								Poco::JSON::Object::Ptr &response) {
 
 			auto groupId = ResolveGroupId(SerialNumber);
@@ -509,7 +511,7 @@ namespace OpenWifi {
 
 			auto effectiveTimeout = requestTimeout.count() > 0 ? requestTimeout : kCommandRestTimeout;
 			auto sent = SDK::CGW::PostInfraCommand(*groupId, SerialNumber, Method, payload,
-										effectiveTimeout, oneway, response, Logger());
+										effectiveTimeout, oneway_rpc, response, Logger());
 
 			if (sent && payload) {
 				try {
@@ -531,7 +533,7 @@ namespace OpenWifi {
 				}
 			}
 
-			if (sent && !oneway && !response.isNull()) {
+			if (sent && !oneway_rpc && !response.isNull()) {
 				try {
 					auto serialInt = Utils::SerialNumberToInt(SerialNumber);
 					std::ostringstream rxStream;

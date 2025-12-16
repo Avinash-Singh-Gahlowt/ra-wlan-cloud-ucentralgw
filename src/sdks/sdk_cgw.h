@@ -43,14 +43,14 @@ namespace OpenWifi::SDK::CGW {
 	 * @param method JSON-RPC method name to execute on the device.
 	 * @param payload Prepared JSON-RPC payload to send through CGW.
 	 * @param timeout Maximum time to wait for the REST request and optional response payload.
-	 * @param oneway When true, do not expect a synchronous payload back from CGW.
+	 * @param oneway_rpc When true, do not expect a synchronous payload back from CGW.
 	 * @param response Populated with the parsed device response when `oneway == false`.
 	 * @param logger Logger used for informational and warning messages.
 	 * @return true if the REST request succeeded and (for non-oneway) a payload was extracted.
 	 */
 	bool PostInfraCommand(
 		const std::string &groupId, const std::string &serialNumber, const std::string &method,
-		const Poco::JSON::Object::Ptr &payload, std::chrono::milliseconds timeout, bool oneway,
+		const Poco::JSON::Object::Ptr &payload, std::chrono::milliseconds timeout, bool oneway_rpc,
 		Poco::JSON::Object::Ptr &response, Poco::Logger &logger);
 
 } // namespace OpenWifi::SDK::CGW

@@ -231,7 +231,7 @@ namespace OpenWifi {
 		std::string groupId_{};
 
 		static inline std::atomic_uint64_t ConcurrentStartingDevices_ = 0;
-		bool ForwardTelemetryCommand(uint64_t RPCID, const std::string &serialNumber,const Poco::JSON::Object &params);
+		bool PostTelemetry(uint64_t RPCID, const std::string &serialNumber,const Poco::JSON::Object &params);
 		bool StartTelemetry(uint64_t RPCID, const std::vector<std::string> &TelemetryTypes);
 		bool StopTelemetry(uint64_t RPCID);
 		void UpdateCounts();

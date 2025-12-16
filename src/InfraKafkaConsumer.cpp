@@ -73,56 +73,31 @@ namespace OpenWifi {
         StopWorkers();
     }
 
-  void InfraKafkaConsumer::HandleMessage(const std::string&, const std::string& Payload) {
-    Poco::JSON::Parser parser;
-    Poco::Dynamic::Var var;
-    try {
-        var = parser.parse(Payload);
-    } catch (const Poco::Exception& e) {
-        poco_warning(Logger(), fmt::format("InfraKafkaConsumer: invalid JSON payload: {}", e.displayText()));
-        return;
-    }
-
-    if (var.type() == typeid(Poco::JSON::Array::Ptr)) {
+  void InfraKafkaConsumer::HandleMessage(const std::string& Payload) {
+        Poco::JSON::Parser parser;
+        Poco::Dynamic::Var var;
         try {
-            auto Array = var.extract<Poco::JSON::Array::Ptr>();
-            if (!Array.isNull()) {
-                for (const auto &item : *Array) {
-                    try {
-                        auto Object = item.extract<Poco::JSON::Object::Ptr>();
-                        if (!Object.isNull()) {
-                            ProcessMessage(Object, Payload);
-                        }
-                    } catch (const Poco::Exception &E) {
-                        poco_warning(Logger(), fmt::format("InfraKafkaConsumer: invalid array element: {}", E.displayText()));
-                    }
-                }
-            }
-        } catch (const Poco::Exception &E) {
-            poco_warning(Logger(), fmt::format("InfraKafkaConsumer: invalid JSON payload array: {}", E.displayText()));
+            var = parser.parse(Payload);
+        } catch (const Poco::Exception& e) {
+            poco_warning(Logger(), fmt::format("InfraKafkaConsumer: invalid JSON payload: {}", e.displayText()));
+            return;
         }
-        return;
-    }
 
-    Poco::JSON::Object::Ptr Message;
-    try {
-        Message = var.extract<Poco::JSON::Object::Ptr>();
-    } catch (const Poco::BadCastException&) {
-        poco_warning(Logger(), "InfraKafkaConsumer: payload root is not a JSON object");
-        return;
-    }
 
-    ProcessMessage(Message, Payload);
+        Poco::JSON::Object::Ptr Message;
+        try {
+            Message = var.extract<Poco::JSON::Object::Ptr>();
+            ProcessMessage(Message);
+        } catch (const Poco::BadCastException&) {
+            poco_warning(Logger(), "InfraKafkaConsumer: payload root is not a JSON object");
+            return;
+        }
     }
 
     void InfraKafkaConsumer::EnqueueMessage(const std::string &Key, const std::string &Payload) {
         if (!Accepting_.load(std::memory_order_acquire)) {
             return;
         }
-        auto total = EnqueuedCount_.fetch_add(1, std::memory_order_relaxed) + 1;
-        poco_trace(Logger(), fmt::format(
-                               "InfraKafkaConsumer: enqueue key='{}' payload_size={} total_enqueued={}",
-                               Key, Payload.size(), total));
         Poco::AutoPtr<InfraKafkaMessage> Notification = new InfraKafkaMessage(Key, Payload);
         WorkQueue_.enqueueNotification(Notification);
     }
@@ -198,11 +173,7 @@ namespace OpenWifi {
             }
 
             try {
-                auto totalDequeued = DequeuedCount_.fetch_add(1, std::memory_order_relaxed) + 1;
-                poco_trace(Logger(), fmt::format(
-                                       "InfraKafkaConsumer: worker={} dequeued key='{}' payload_size={} total_dequeued={}",
-                                       workerIndex, message->Key(), message->Payload().size(), totalDequeued));
-                HandleMessage(message->Key(), message->Payload());
+                HandleMessage(message->Payload());
             } catch (const Poco::Exception &E) {
                 Logger().log(E);
             } catch (const std::exception &E) {
@@ -213,13 +184,13 @@ namespace OpenWifi {
         }
     }
 
-    void InfraKafkaConsumer::ProcessMessage(const Poco::JSON::Object::Ptr &Message, const std::string &RawPayload) {
+    void InfraKafkaConsumer::ProcessMessage(const Poco::JSON::Object::Ptr &Message) {
         if (Message.isNull()) {
             return;
         }
         if (!Message->has("type")){
             poco_debug(Logger(), "InfraKafkaConsumer: Handling unsolicited msg");
-            return Message->has("method") ? (HandleGeneric(Message, RawPayload), void()) : void();
+            return Message->has("method") ? (HandleGeneric(Message), void()) : void();
         }
         std::string Type;
         try {
@@ -232,11 +203,7 @@ namespace OpenWifi {
         poco_debug(Logger(), fmt::format("InfraKafkaConsumer: received type='{}'", Type));
 
         if (Type == "infra_join") {
-            auto joinCount = InfraJoinHandledCount_.fetch_add(1, std::memory_order_relaxed) + 1;
-            poco_trace(Logger(), fmt::format(
-                "InfraKafkaConsumer: infra_join processed total={} total_dequeued={}",
-                joinCount, DequeuedCount_.load(std::memory_order_relaxed)));
-            HandleJoin(Message, RawPayload);
+            HandleJoin(Message);
             return;
         }
 
@@ -294,7 +261,7 @@ namespace OpenWifi {
         return ExtractSerialFromFrame(Var);
     }
 
-    void InfraKafkaConsumer::HandleJoin(const Poco::JSON::Object::Ptr &Message, const std::string &) {
+    void InfraKafkaConsumer::HandleJoin(const Poco::JSON::Object::Ptr &Message) {
         if (!Message->has("connect_message_payload")) {
             poco_warning(Logger(), "InfraKafkaConsumer: infra_join missing connect_message_payload");
             return;
@@ -362,7 +329,7 @@ namespace OpenWifi {
         Connection->EndConnection();
     }
 
-    void InfraKafkaConsumer::HandleGeneric(const Poco::JSON::Object::Ptr &Message, const std::string &RawPayload) {
+    void InfraKafkaConsumer::HandleGeneric(const Poco::JSON::Object::Ptr &Message) {
         std::string FramePayload;
         if (Message->has("jsonrpc")) {
             std::ostringstream OS;
@@ -370,7 +337,7 @@ namespace OpenWifi {
             FramePayload = OS.str();
             poco_trace(Logger(), fmt::format("Handle generic message that has jsonrpc {}",FramePayload));
         } else {
-            FramePayload = RawPayload;
+            return;
         }
 
         auto Serial = ExtractSerialFromPayload(FramePayload);

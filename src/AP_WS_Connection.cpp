@@ -39,17 +39,6 @@
 
 namespace OpenWifi {
 
-	bool AP_WS_Connection::ForwardTelemetryCommand(uint64_t rpcId, const std::string &serialNumber,
-									 const Poco::JSON::Object &params) {
-			bool sent = false;
-			std::string uuid{};
-			CommandManager()->PostCommand(rpcId, APCommands::Commands::telemetry, serialNumber,
-										  uCentralProtocol::TELEMETRY, params, uuid, sent, false,
-										  false);
-			if (!sent) 
-				poco_error(Logger_, fmt::format("Telemetry send failure({}):RPCID:{},serialNumber:{}", sent,rpcId,serialNumber));
-		return sent;
-	}
 	void AP_WS_Connection::LogException(const Poco::Exception &E) {
 		poco_information(Logger_, fmt::format("EXCEPTION({}): {}", CId_, E.displayText()));
 	}
@@ -631,9 +620,21 @@ namespace OpenWifi {
 				Types.add(type);
 		}
 		Params.set(RESTAPI::Protocol::TYPES, Types);
-		return ForwardTelemetryCommand(RPCID, SerialNumber_, Params);
+		return PostTelemetry(RPCID, SerialNumber_, Params);
 	}
 
+	bool AP_WS_Connection::PostTelemetry(uint64_t rpcId, const std::string &serialNumber,
+									 const Poco::JSON::Object &params) {
+			bool sent = false;
+			std::string uuid{};
+			CommandManager()->PostCommand(rpcId, APCommands::Commands::telemetry, serialNumber,
+										  uCentralProtocol::TELEMETRY, params, uuid, sent, false,
+										  false);
+			if (!sent) 
+				poco_error(Logger_, fmt::format("Telemetry send failure({}):RPCID:{},serialNumber:{}", sent,rpcId,serialNumber));
+		return sent;
+	}
+	
 	bool AP_WS_Connection::StopTelemetry(uint64_t RPCID) {
 		poco_information(Logger_, fmt::format("TELEMETRY({}): Stopping.", CId_));
 		Poco::JSON::Object Params;
@@ -641,7 +642,7 @@ namespace OpenWifi {
 		Params.set("interval", 0);
 		TelemetryKafkaPackets_ = TelemetryWebSocketPackets_ = TelemetryInterval_ =
 			TelemetryKafkaTimer_ = TelemetryWebSocketTimer_ = 0;
-		return ForwardTelemetryCommand(RPCID, SerialNumber_, Params);
+		return PostTelemetry(RPCID, SerialNumber_, Params);
 	}
 
 	void AP_WS_Connection::UpdateCounts() {
