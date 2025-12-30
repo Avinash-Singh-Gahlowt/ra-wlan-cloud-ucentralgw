@@ -2,7 +2,7 @@
 // Created by stephane bourque on 2022-07-26.
 //
 
-#include "AP_WS_Connection.h"
+#include "AP_Connection.h"
 #include "StorageService.h"
 
 #include "fmt/format.h"
@@ -10,7 +10,7 @@
 #include <GWKafkaEvents.h>
 
 namespace OpenWifi {
-	void AP_WS_Connection::Process_crashlog(Poco::JSON::Object::Ptr ParamsObj) {
+	void AP_Connection::Process_crashlog(Poco::JSON::Object::Ptr ParamsObj) {
 		if (ParamsObj->has(uCentralProtocol::UUID)
 			&& ParamsObj->has(uCentralProtocol::LOGLINES)) {
 			poco_trace(Logger_, fmt::format("CRASH-LOG({}): new entry.", CId_));

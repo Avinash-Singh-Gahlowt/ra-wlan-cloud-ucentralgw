@@ -2,7 +2,7 @@
 // Created by stephane bourque on 2022-07-26.
 //
 
-#include "AP_WS_Connection.h"
+#include "AP_Connection.h"
 #include "AP_WS_Server.h"
 #include "StateUtils.h"
 #include "StorageService.h"
@@ -15,7 +15,7 @@
 #include "fmt/format.h"
 
 namespace OpenWifi {
-	void AP_WS_Connection::Process_state(Poco::JSON::Object::Ptr ParamsObj) {
+	void AP_Connection::Process_state(Poco::JSON::Object::Ptr ParamsObj) {
 		if (!State_.Connected) {
 			poco_warning(Logger_,
 						 fmt::format("INVALID-PROTOCOL({}): Device '{}' is not following protocol",

@@ -157,6 +157,8 @@ add_executable( owgw
         src/storage/storage_tables.cpp
         src/RESTAPI/RESTAPI_routers.cpp
         src/Daemon.cpp src/Daemon.h
+        src/AP_SERVER.cpp src/AP_SERVER.h
+        src/AP_Connection.cpp src/AP_Connection.h
         src/AP_WS_Server.cpp src/AP_WS_Server.h
         src/StorageService.cpp src/StorageService.h
         src/CommandManager.cpp src/CommandManager.h

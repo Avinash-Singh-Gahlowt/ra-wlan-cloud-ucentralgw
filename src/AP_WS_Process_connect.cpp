@@ -2,7 +2,7 @@
 // Created by stephane bourque on 2022-07-26.
 //
 
-#include "AP_WS_Connection.h"
+#include "AP_Connection.h"
 #include "AP_WS_Server.h"
 #include "CentralConfig.h"
 #include "Daemon.h"
@@ -53,8 +53,8 @@ namespace OpenWifi {
 		}
 	}
 
-	void AP_WS_Connection::Process_connect(Poco::JSON::Object::Ptr ParamsObj,
-										   const std::string &Serial) {
+	void AP_Connection::Process_connect(Poco::JSON::Object::Ptr ParamsObj,
+										 const std::string &Serial) {
 		if (ParamsObj->has(uCentralProtocol::UUID) && ParamsObj->has(uCentralProtocol::FIRMWARE) &&
 			ParamsObj->has(uCentralProtocol::CAPABILITIES)) {
 			uint64_t UUID = ParamsObj->get(uCentralProtocol::UUID);
@@ -80,7 +80,7 @@ namespace OpenWifi {
 			State_.UUID = UUID;
 			State_.Firmware = Firmware;
 			State_.PendingUUID = 0;
-			State_.Address = Utils::FormatIPv6(WS_->peerAddress().toString());
+			State_.Address = Utils::FormatIPv6(PeerAddress_.toString());
 			CId_ = SerialNumber_ + "@" + CId_;
 
 			auto Platform = Poco::toLower(Caps.Platform());

@@ -2,7 +2,7 @@
 // Created by stephane bourque on 2022-07-26.
 //
 
-#include "AP_WS_Connection.h"
+#include "AP_Connection.h"
 #include "CommandManager.h"
 #include "StorageService.h"
 
@@ -11,7 +11,7 @@
 #include "framework/ow_constants.h"
 
 namespace OpenWifi {
-	void AP_WS_Connection::Process_recovery(Poco::JSON::Object::Ptr ParamsObj) {
+	void AP_Connection::Process_recovery(Poco::JSON::Object::Ptr ParamsObj) {
 		if (ParamsObj->has(uCentralProtocol::SERIAL) &&
 			ParamsObj->has(uCentralProtocol::FIRMWARE) && ParamsObj->has(uCentralProtocol::UUID) &&
 			ParamsObj->has(uCentralProtocol::REBOOT) &&
