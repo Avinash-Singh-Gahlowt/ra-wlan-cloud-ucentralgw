@@ -201,10 +201,14 @@ namespace OpenWifi {
 		while(Running_) {
 			std::this_thread::sleep_for(std::chrono::seconds(10));
 
-			while(Running_ && !CleanupSessions_.empty()) {
+			while(Running_) {
 				std::pair<uint64_t, uint64_t> Session;
 				{
 					std::lock_guard G(CleanupMutex_);
+					auto isEmpty = CleanupSessions_.empty();
+					if (isEmpty) {
+						break;
+					}
 					Session = CleanupSessions_.front();
 					CleanupSessions_.pop_front();
 				}

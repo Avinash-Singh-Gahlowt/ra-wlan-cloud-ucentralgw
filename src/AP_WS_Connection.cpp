@@ -51,8 +51,7 @@ namespace OpenWifi {
 		WS_->setBlocking(false);
 		uuid_ = MicroServiceRandom(std::numeric_limits<std::uint64_t>::max()-1);
 
-		class AP_WS_Server *WSServerPtr = dynamic_cast<class AP_WS_Server *>(GetAPServer());
-		WSServerPtr->IncrementConnectionCount();
+		GetAPServer()->IncrementConnectionCount();
 	}
 
 	void AP_WS_Connection::Start() {
@@ -73,8 +72,7 @@ namespace OpenWifi {
 
 	AP_WS_Connection::~AP_WS_Connection() {
 		std::lock_guard G(ConnectionMutex_);
-		class AP_WS_Server *WSServerPtr = dynamic_cast<class AP_WS_Server *>(GetAPServer());
-		WSServerPtr->DecrementConnectionCount();
+		GetAPServer()->DecrementConnectionCount();
 		EndConnection();
 		poco_debug(Logger_, fmt::format("TERMINATION({}): Session={}, Connection removed.", SerialNumber_,
 										State_.sessionId));
@@ -106,8 +104,7 @@ namespace OpenWifi {
 			if(!SerialNumber_.empty()) {
 				DeviceDisconnectionCleanup(SerialNumber_, uuid_);
 			}
-			class AP_WS_Server *WSServerPtr = dynamic_cast<class AP_WS_Server *>(GetAPServer());
-			WSServerPtr->AddCleanupSession(State_.sessionId, SerialNumberInt_);
+			GetAPServer()->AddCleanupSession(State_.sessionId, SerialNumberInt_);
 		}
 	}
 
@@ -149,8 +146,7 @@ namespace OpenWifi {
 			}
 
 			Poco::Crypto::X509Certificate PeerCert(SS->peerCertificate());
-			class AP_WS_Server *WSServerPtr = dynamic_cast<class AP_WS_Server *>(GetAPServer());
-			if (!WSServerPtr->ValidateCertificate(CId_, PeerCert)) {
+			if (!GetAPServer()->ValidateCertificate(CId_, PeerCert)) {
 				State_.VerifiedCertificate = GWObjects::NO_CERTIFICATE;
 				poco_warning(Logger_,
 							 fmt::format("TLS-CONNECTION({}): Session={} Device certificate is not "
@@ -174,14 +170,14 @@ namespace OpenWifi {
 					   fmt::format("TLS-CONNECTION({}): Session={} Valid certificate: CN={}", CId_,
 								   State_.sessionId, CN_));
 
-			if (WSServerPtr->IsSim(CN_) && !WSServerPtr->IsSimEnabled()) {
+			if (GetAPServer()->IsSim(CN_) && !GetAPServer()->IsSimEnabled()) {
 				poco_warning(Logger_, fmt::format("TLS-CONNECTION({}): Session={} Sim Device {} is "
 												  "not allowed. Disconnecting.",
 												  CId_, State_.sessionId, CN_));
 				return false;
 			}
 
-			if(WSServerPtr->IsSim(SerialNumber_)) {
+			if(GetAPServer()->IsSim(SerialNumber_)) {
 				State_.VerifiedCertificate = GWObjects::SIMULATED;
 				Simulated_ = true;
 			}
@@ -286,8 +282,7 @@ namespace OpenWifi {
 		std::lock_guard	G(ConnectionMutex_);
 
 		State_.LastContact = LastContact_ = Utils::Now();
-		class AP_WS_Server *WSServerPtr = dynamic_cast<class AP_WS_Server *>(GetAPServer());
-		if (WSServerPtr->Running() && (DeviceValidated_ || ValidatedDevice())) {
+		if (GetAPServer()->Running() && (DeviceValidated_ || ValidatedDevice())) {
 			try {
 				return ProcessIncomingFrame();
 			} catch (const Poco::Exception &E) {
@@ -325,8 +320,7 @@ namespace OpenWifi {
 			IncomingFrame.append(0);
 
 			State_.RX += IncomingSize;
-			class AP_WS_Server *WSServerPtr = dynamic_cast<class AP_WS_Server *>(GetAPServer());
-			WSServerPtr->AddRX(IncomingSize);
+			GetAPServer()->AddRX(IncomingSize);
 			State_.MessageCount++;
 			State_.LastContact = Utils::Now();
 
@@ -523,8 +517,7 @@ namespace OpenWifi {
 			}
 #endif
 			State_.TX += BytesSent;
-			class AP_WS_Server *WSServerPtr = dynamic_cast<class AP_WS_Server *>(GetAPServer());
-			WSServerPtr->AddTX(BytesSent);
+			GetAPServer()->AddTX(BytesSent);
 			return BytesSent == Payload.size();
 		} catch (const Poco::Exception &E) {
 			Logger_.log(E);
