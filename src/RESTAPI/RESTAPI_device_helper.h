@@ -1,10 +1,15 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 // Created by stephane bourque on 2021-12-05.
 //
 
 #pragma once
 
-#include "AP_WS_Server.h"
+#include "AP_ServerProvider.h"
 #include "RESTObjects/RESTAPI_GWobjects.h"
 #include "StorageService.h"
 #include <Poco/JSON/Parser.h>
@@ -13,11 +18,11 @@ namespace OpenWifi {
 
 	inline void CompleteDeviceInfo(const GWObjects::Device &Device, Poco::JSON::Object &Answer) {
 		GWObjects::ConnectionState CS;
-		AP_WS_Server()->GetState(Device.SerialNumber, CS);
+		GetAPServer()->GetState(Device.SerialNumber, CS);
 		GWObjects::HealthCheck HC;
-		AP_WS_Server()->GetHealthcheck(Device.SerialNumber, HC);
+		GetAPServer()->GetHealthcheck(Device.SerialNumber, HC);
 		std::string Stats;
-		AP_WS_Server()->GetStatistics(Device.SerialNumber, Stats);
+		GetAPServer()->GetStatistics(Device.SerialNumber, Stats);
 
 		Poco::JSON::Object DeviceInfo;
 		Device.to_json(DeviceInfo);

@@ -157,6 +157,9 @@ add_executable( owgw
         src/storage/storage_tables.cpp
         src/RESTAPI/RESTAPI_routers.cpp
         src/Daemon.cpp src/Daemon.h
+        src/AP_SERVER.cpp src/AP_SERVER.h
+        src/AP_ServerProvider.cpp src/AP_ServerProvider.h
+        src/AP_Connection.cpp src/AP_Connection.h
         src/AP_WS_Server.cpp src/AP_WS_Server.h
         src/StorageService.cpp src/StorageService.h
         src/CommandManager.cpp src/CommandManager.h
@@ -190,31 +193,31 @@ add_executable( owgw
         src/RADIUS_helpers.h
         src/VenueBroadcaster.h
         src/sdks/sdk_prov.h
-        src/AP_WS_Process_connect.cpp
-        src/AP_WS_Process_state.cpp
-        src/AP_WS_Process_healthcheck.cpp
-        src/AP_WS_Process_log.cpp
-        src/AP_WS_Process_crashlog.cpp
-        src/AP_WS_Process_ping.cpp
-        src/AP_WS_Process_cfgpending.cpp
-        src/AP_WS_Process_recovery.cpp
-        src/AP_WS_Process_deviceupdate.cpp
-        src/AP_WS_Process_telemetry.cpp
-        src/AP_WS_Process_venuebroadcast.cpp
+        src/AP_Process_connect.cpp
+        src/AP_Process_state.cpp
+        src/AP_Process_healthcheck.cpp
+        src/AP_Process_log.cpp
+        src/AP_Process_crashlog.cpp
+        src/AP_Process_ping.cpp
+        src/AP_Process_cfgpending.cpp
+        src/AP_Process_recovery.cpp
+        src/AP_Process_deviceupdate.cpp
+        src/AP_Process_telemetry.cpp
+        src/AP_Process_venuebroadcast.cpp
         src/RADIUS_Destination.h
         src/UI_GW_WebSocketNotifications.cpp src/UI_GW_WebSocketNotifications.h
         src/framework/RESTAPI_SystemConfiguration.h
         src/ScriptManager.cpp src/ScriptManager.h
         src/SignatureMgr.h
-        src/AP_WS_Process_event.cpp
-        src/AP_WS_Process_wifiscan.cpp
-        src/AP_WS_Process_alarm.cpp
+        src/AP_Process_event.cpp
+        src/AP_Process_wifiscan.cpp
+        src/AP_Process_alarm.cpp
         src/GWKafkaEvents.cpp src/GWKafkaEvents.h
         src/RegulatoryInfo.cpp src/RegulatoryInfo.h
         src/RADIUSSessionTracker.cpp src/RADIUSSessionTracker.h
         src/libs/Scheduler.h src/libs/InterruptableSleep.h src/libs/ctpl_stl.h src/libs/Cron.h
-        src/GenericScheduler.cpp src/GenericScheduler.h src/framework/default_device_types.h src/AP_WS_Process_rebootLog.cpp src/AP_WS_ConfigAutoUpgrader.cpp src/AP_WS_ConfigAutoUpgrader.h src/RESTAPI/RESTAPI_default_firmwares.cpp src/RESTAPI/RESTAPI_default_firmwares.h src/RESTAPI/RESTAPI_default_firmware.cpp src/RESTAPI/RESTAPI_default_firmware.h src/storage/storage_def_firmware.cpp src/firmware_revision_cache.h src/sdks/sdk_fms.h
-        src/AP_WS_LookForUpgrade.cpp)
+        src/GenericScheduler.cpp src/GenericScheduler.h src/framework/default_device_types.h src/AP_Process_rebootLog.cpp src/AP_WS_ConfigAutoUpgrader.cpp src/AP_WS_ConfigAutoUpgrader.h src/RESTAPI/RESTAPI_default_firmwares.cpp src/RESTAPI/RESTAPI_default_firmwares.h src/RESTAPI/RESTAPI_default_firmware.cpp src/RESTAPI/RESTAPI_default_firmware.h src/storage/storage_def_firmware.cpp src/firmware_revision_cache.h src/sdks/sdk_fms.h
+        src/AP_LookForUpgrade.cpp)
 
 if(NOT SMALL_BUILD)
 

@@ -1,8 +1,14 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 // Created by stephane bourque on 2023-03-19.
 //
 
 #include "RADIUSSessionTracker.h"
+#include "AP_ServerProvider.h"
 #include <fmt/format.h>
 #include <framework/utils.h>
 
@@ -376,7 +382,7 @@ namespace OpenWifi {
 		P.AppendAttribute(RADIUS::Attributes::PROXY_STATE, ProxyState);
 		P.RecomputeAuthenticator(session->secret);
 		P.Log(std::cout);
-		AP_WS_Server()->SendRadiusCoAData(session->serialNumber, P.Buffer(), P.Size_);
+		GetAPServer()->SendRadiusCoAData(session->serialNumber, P.Buffer(), P.Size_);
 
 		return true;
 	}

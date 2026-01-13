@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 //	License type: BSD 3-Clause License
 //	License copy: https://github.com/Telecominfraproject/wlan-cloud-ucentralgw/blob/master/LICENSE
@@ -11,7 +16,7 @@
 
 #include "Daemon.h"
 #ifdef TIP_GATEWAY_SERVICE
-#include "AP_WS_Server.h"
+#include "AP_ServerProvider.h"
 #include "StorageService.h"
 #include "CapabilitiesCache.h"
 #include "RADIUSSessionTracker.h"
@@ -74,7 +79,7 @@ namespace OpenWifi::GWObjects {
         if (Res.has_value()) {
             Res.value().to_json(SerialNumber,Obj);
 #else
-        if (AP_WS_Server()->GetState(SerialNumber, ConState)) {
+        if (GetAPServer()->GetState(SerialNumber, ConState)) {
 			ConState.to_json(SerialNumber,Obj);
 #endif
 		} else {

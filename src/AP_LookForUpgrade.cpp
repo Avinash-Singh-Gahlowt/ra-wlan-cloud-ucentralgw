@@ -1,11 +1,21 @@
-
-#include <AP_WS_Connection.h>
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
+#include "AP_Connection.h"
 #include "ConfigurationCache.h"
 #include "UI_GW_WebSocketNotifications.h"
 #include "CommandManager.h"
+#include "StorageService.h"
+#include "CentralConfig.h"
+#include "framework/MicroServiceFuncs.h"
+#include "framework/ow_constants.h"
+#include <fmt/format.h>
+#include <Poco/JSON/Parser.h>
 
 namespace OpenWifi {
-	bool AP_WS_Connection::LookForUpgrade(Poco::Data::Session &Session, const uint64_t UUID, uint64_t &UpgradedUUID) {
+	bool AP_Connection::LookForUpgrade(Poco::Data::Session &Session, const uint64_t UUID, uint64_t &UpgradedUUID) {
 
 		//	A UUID of zero means ignore updates for that connection.
 		if (UUID == 0)

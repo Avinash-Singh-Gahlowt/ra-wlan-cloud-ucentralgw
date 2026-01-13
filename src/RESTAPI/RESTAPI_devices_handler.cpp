@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 //	License type: BSD 3-Clause License
 //	License copy: https://github.com/Telecominfraproject/wlan-cloud-ucentralgw/blob/master/LICENSE
@@ -9,7 +14,7 @@
 #include "Poco/Array.h"
 #include "Poco/JSON/Stringifier.h"
 
-#include "AP_WS_Server.h"
+#include "AP_ServerProvider.h"
 #include "Poco/StringTokenizer.h"
 #include "RESTAPI/RESTAPI_device_helper.h"
 #include "RESTAPI_devices_handler.h"
@@ -60,7 +65,7 @@ namespace OpenWifi {
 			GWObjects::DeviceConnectionStatistics DCS;
 			Poco::JSON::Object Answer;
 
-			AP_WS_Server()->AverageDeviceStatistics(DCS.connectedDevices, DCS.averageConnectionTime,
+			GetAPServer()->AverageDeviceStatistics(DCS.connectedDevices, DCS.averageConnectionTime,
 													DCS.connectingDevices);
 			DCS.to_json(Answer);
 			return ReturnObject(Answer);
@@ -142,7 +147,7 @@ namespace OpenWifi {
 			auto lowLimit = GetParameter("lowLimit",30);
 			auto highLimit = GetParameter("highLimit",80);
 			std::vector<std::string>	SerialNumbers;
-			AP_WS_Server()->GetHealthDevices(lowLimit,highLimit,SerialNumbers);
+			GetAPServer()->GetHealthDevices(lowLimit,highLimit,SerialNumbers);
 
 			Poco::JSON::Array Objects;
 			for(const auto &s:SerialNumbers)

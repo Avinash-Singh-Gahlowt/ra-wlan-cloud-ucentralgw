@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 //	License type: BSD 3-Clause License
 //	License copy: https://github.com/Telecominfraproject/wlan-cloud-ucentralgw/blob/master/LICENSE
@@ -15,6 +20,7 @@
 #include <framework/UI_WebSocketClientServer.h>
 #include <framework/default_device_types.h>
 
+#include "AP_ServerProvider.h"
 #include "AP_WS_Server.h"
 #include "CommandManager.h"
 #include "Daemon.h"
@@ -57,7 +63,7 @@ namespace OpenWifi {
 
 	static std::string ALBHealthCallback() {
 		uint64_t Connections, AverageConnectionTime, NumberOfConnectingDevices;
-		AP_WS_Server()->AverageDeviceStatistics(Connections, AverageConnectionTime,
+		GetAPServer()->AverageDeviceStatistics(Connections, AverageConnectionTime,
 								NumberOfConnectingDevices);
 		std::ostringstream os;
 		os << 	"Connections: " << Connections << std::endl <<
@@ -71,6 +77,7 @@ namespace OpenWifi {
 		DeviceTypes_ = DefaultDeviceTypeList;
 		WebSocketProcessor_ = std::make_unique<GwWebSocketClient>(logger());
 		MicroServiceALBCallback(ALBHealthCallback);
+		AP_ServerProvider::Register(AP_WS_Server());
 	}
 
 	[[nodiscard]] std::string Daemon::IdentifyDevice(const std::string &Id) const {

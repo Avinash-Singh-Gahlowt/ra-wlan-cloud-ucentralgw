@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 //	License type: BSD 3-Clause License
 //	License copy: https://github.com/Telecominfraproject/wlan-cloud-ucentralgw/blob/master/LICENSE
@@ -11,6 +16,7 @@
 
 #include "Poco/JSON/Parser.h"
 
+#include "AP_ServerProvider.h"
 #include "AP_WS_Server.h"
 #include "CentralConfig.h"
 #include "CommandManager.h"
@@ -78,7 +84,7 @@ namespace OpenWifi {
 			return GetStatus();
 		case APCommands::Commands::rtty: {
 			GWObjects::DeviceRestrictions Restrictions;
-			if (!AP_WS_Server()->Connected(SerialNumberInt_, Restrictions)) {
+			if (!GetAPServer()->Connected(SerialNumberInt_, Restrictions)) {
 				CallCanceled(Command_.c_str(), RESTAPI::Errors::DeviceNotConnected);
 				return BadRequest(RESTAPI::Errors::DeviceNotConnected);
 			}
@@ -199,7 +205,7 @@ namespace OpenWifi {
 					fmt::format("{}:{}:{}", Command_, TransactionId_, SerialNumber_));
 				GWObjects::DeviceRestrictions Restrictions;
 				if (PostCommand.RequireConnection &&
-					!AP_WS_Server()->Connected(SerialNumberInt_, Restrictions)) {
+					!GetAPServer()->Connected(SerialNumberInt_, Restrictions)) {
 					CallCanceled(Command_.c_str(), RESTAPI::Errors::DeviceNotConnected);
 					return BadRequest(RESTAPI::Errors::DeviceNotConnected);
 				}
@@ -259,10 +265,10 @@ namespace OpenWifi {
 							   Poco::Thread::current()->id(), StatsType));
 		if (QB_.LastOnly) {
 			std::string Stats;
-			if (AP_WS_Server()->GetStatistics(SerialNumber_, Stats) && !Stats.empty()) {
+			if (GetAPServer()->GetStatistics(SerialNumber_, Stats) && !Stats.empty()) {
 				return ReturnRawJSON(Stats);
 			}
-			if (AP_WS_Server()->Connected(SerialNumberInt_)) {
+			if (GetAPServer()->Connected(SerialNumberInt_)) {
 				return BadRequest(RESTAPI::Errors::NoDeviceStatisticsYet);
 			}
 			return BadRequest(RESTAPI::Errors::DeviceNotConnected);
@@ -315,7 +321,7 @@ namespace OpenWifi {
 							   Requester(), SerialNumber_, Poco::Thread::current()->id()));
 		GWObjects::ConnectionState State;
 
-		if (AP_WS_Server()->GetState(SerialNumber_, State)) {
+		if (GetAPServer()->GetState(SerialNumber_, State)) {
 			Poco::JSON::Object RetObject;
 			State.to_json(SerialNumber_, RetObject);
 			return ReturnObject(RetObject);
@@ -369,7 +375,7 @@ namespace OpenWifi {
 
 		if (QB_.LastOnly) {
 			GWObjects::HealthCheck HC;
-			if (AP_WS_Server()->GetHealthcheck(SerialNumber_, HC)) {
+			if (GetAPServer()->GetHealthcheck(SerialNumber_, HC)) {
 				Poco::JSON::Object Answer;
 				HC.to_json(Answer);
 				return ReturnObject(Answer);
@@ -1201,7 +1207,7 @@ namespace OpenWifi {
 
 				if (RTTYS_server()->UseInternal()) {
 					std::uint64_t SN = Utils::SerialNumberToInt(SerialNumber_);
-					bool mTLS = AP_WS_Server()->DeviceRequiresSecureRTTY(SN);
+					bool mTLS = GetAPServer()->DeviceRequiresSecureRTTY(SN);
 					auto Hash =  Utils::ComputeHash(UserInfo_.webtoken.refresh_token_, Utils::Now());
 					Rtty.Token = Hash.substr(0, RTTY_DEVICE_TOKEN_LENGTH);
 					if (!RTTYS_server()->CreateEndPoint(Rtty.ConnectionId, Rtty.Token, Requester(),
@@ -1300,17 +1306,17 @@ namespace OpenWifi {
 			if (!StatusOnly) {
 				if (KafkaOnly) {
 					if (Interval) {
-						AP_WS_Server()->SetKafkaTelemetryReporting(
+						GetAPServer()->SetKafkaTelemetryReporting(
 							CMD_RPC, IntSerialNumber, Interval, Lifetime, TelemetryTypes);
 						Answer.set("action", "Kafka telemetry started.");
 						Answer.set("uuid", CMD_UUID);
 					} else {
-						AP_WS_Server()->StopKafkaTelemetry(CMD_RPC, IntSerialNumber);
+						GetAPServer()->StopKafkaTelemetry(CMD_RPC, IntSerialNumber);
 						Answer.set("action", "Kafka telemetry stopped.");
 					}
 				} else {
 					if (Interval) {
-						AP_WS_Server()->SetWebSocketTelemetryReporting(
+						GetAPServer()->SetWebSocketTelemetryReporting(
 							CMD_RPC, IntSerialNumber, Interval, Lifetime, TelemetryTypes);
 						std::string EndPoint;
 						if (TelemetryStream()->CreateEndpoint(
@@ -1324,7 +1330,7 @@ namespace OpenWifi {
 						}
 					} else {
 						Answer.set("action", "WebSocket telemetry stopped.");
-						AP_WS_Server()->StopWebSocketTelemetry(CMD_RPC, IntSerialNumber);
+						GetAPServer()->StopWebSocketTelemetry(CMD_RPC, IntSerialNumber);
 					}
 				}
 
@@ -1356,7 +1362,7 @@ namespace OpenWifi {
 			std::uint64_t TelemetryWebSocketCount, TelemetryKafkaCount, TelemetryInterval,
 				TelemetryWebSocketTimer, TelemetryKafkaTimer, TelemetryWebSocketPackets,
 				TelemetryKafkaPackets;
-			AP_WS_Server()->GetTelemetryParameters(
+			GetAPServer()->GetTelemetryParameters(
 				IntSerialNumber, TelemetryRunning, TelemetryInterval, TelemetryWebSocketTimer,
 				TelemetryKafkaTimer, TelemetryWebSocketCount, TelemetryKafkaCount,
 				TelemetryWebSocketPackets, TelemetryKafkaPackets);

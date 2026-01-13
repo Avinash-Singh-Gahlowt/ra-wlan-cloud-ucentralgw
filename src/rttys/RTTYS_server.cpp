@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 // Created by stephane bourque on 2021-11-23.
 //
@@ -5,12 +10,13 @@
 #include "rttys/RTTYS_server.h"
 #include "rttys/RTTYS_WebServer.h"
 
-#include "AP_WS_Server.h"
+#include "AP_ServerProvider.h"
 
 #include "fmt/format.h"
 #include "framework/MicroServiceFuncs.h"
 
 #include "Poco/Net/SecureStreamSocketImpl.h"
+#include "Poco/Net/X509Certificate.h"
 #include "nlohmann/json.hpp"
 
 #include "Poco/NObserver.h"
@@ -71,7 +77,9 @@ namespace OpenWifi {
 				const auto &RootCas =
 					MicroServiceConfigPath("ucentral.websocket.host.0.rootca", "");
 				const auto &Cas = MicroServiceConfigPath("ucentral.websocket.host.0.cas", "");
-
+				const auto &ClientCasFileName =
+					MicroServiceConfigPath("ucentral.websocket.host.0.clientcas", "");
+				
 				Poco::Net::Context::Params P;
 
 				P.verificationMode = Poco::Net::Context::VERIFY_ONCE;
@@ -116,6 +124,16 @@ namespace OpenWifi {
 					*SecureServerDeviceSocket_,
 					Poco::NObserver<RTTYS_server, Poco::Net::ReadableNotification>(
 						*this, &RTTYS_server::onDeviceAccept));
+				ClientCasCerts_.clear();
+				if (!ClientCasFileName.empty()&&(!IsCertOk() && !IssuerFileName.empty())) {
+					ClientCasCerts_ = Poco::Net::X509Certificate::readPEM(ClientCasFileName);
+					IssuerCert_ = std::make_unique<Poco::Crypto::X509Certificate>(IssuerFileName);
+					poco_information(Logger(), fmt::format("Certificate Issuer Name:{}",IssuerCert_->issuerName()));
+				} else {
+					ClientCasCerts_.clear();
+					IssuerCert_.reset();
+					poco_warning(Logger(), fmt::format("Unable to load client CA ({}) or issuer ({})", ClientCasFileName, IssuerFileName));
+				}
 			}
 
 			ReactorThread_.start(Reactor_);
@@ -214,7 +232,7 @@ namespace OpenWifi {
 					poco_debug(Logger(),fmt::format("{}: Device has certificate.", CId_));
 					Cert = std::make_unique<Poco::Crypto::X509Certificate>(SS->peerCertificate());
 					cn = Poco::trim(Poco::toLower(Cert->commonName()));
-					if (AP_WS_Server()->ValidateCertificate(CId_, *Cert)) {
+					if (ValidateCertificate(CId_, *Cert)) {
 						poco_information(
 							Logger(),
 							fmt::format("{}: Device {} has been validated.", cn, CId_));
@@ -249,6 +267,23 @@ namespace OpenWifi {
 											*this, &RTTYS_server::onClientSocketError));
 		}
 		Clients_.erase(fd);
+	}
+
+	bool RTTYS_server::ValidateCertificate(const std::string &ConnectionId,
+										   const Poco::Crypto::X509Certificate &Certificate) {
+		if (IsCertOk()) {
+			for (const auto &cert : ClientCasCerts_) {
+				if (Certificate.issuedBy(cert)) {
+					return true;
+				}
+			}
+			poco_warning(
+				Logger(),
+				fmt::format(
+					"CERTIFICATE({}): issuer mismatch. Certificate not issued by any trusted CA",
+					ConnectionId));
+		}
+		return false;
 	}
 
 	void RTTYS_server::AddNewSocket(Poco::Net::StreamSocket &Socket, std::unique_ptr<Poco::Crypto::X509Certificate> P, bool valid, const std::string &cid, const std::string &cn) {

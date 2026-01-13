@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 //	License type: BSD 3-Clause License
 //	License copy: https://github.com/Telecominfraproject/wlan-cloud-ucentralgw/blob/master/LICENSE
@@ -10,6 +15,7 @@
 
 #include "Poco/JSON/Parser.h"
 
+#include "AP_ServerProvider.h"
 #include "AP_WS_Server.h"
 #include "CommandManager.h"
 #include "StorageService.h"
@@ -325,7 +331,7 @@ namespace OpenWifi {
 							}
 
 							auto SerialNumberInt = Utils::SerialNumberToInt(Cmd.SerialNumber);
-							if (!AP_WS_Server()->Connected(SerialNumberInt)) {
+							if (!GetAPServer()->Connected(SerialNumberInt)) {
 								poco_trace(
 									MyLogger,
 									fmt::format("{}: Serial={} Command={} Device is not connected.",
@@ -440,7 +446,7 @@ namespace OpenWifi {
 			std::lock_guard M(Mutex_);
 			OutStandingRequests_[RPC_ID] = CInfo;
 		}
-		if (AP_WS_Server()->SendFrame(SerialNumber, ToSend.str())) {
+		if (GetAPServer()->SendFrame(SerialNumber, ToSend.str())) {
 			poco_debug(Logger(), fmt::format("{}: Sent command. ID: {}", UUID, RPC_ID));
 			Sent = true;
 			return CInfo.rpc_entry;
@@ -462,6 +468,6 @@ namespace OpenWifi {
 		std::stringstream ToSend;
 		CompleteRPC.stringify(ToSend);
 		poco_debug(Logger(), fmt::format("{}: Fire and forget command {}.", SerialNumber, Method));
-		return AP_WS_Server()->SendFrame(SerialNumber, ToSend.str())>0;
+		return GetAPServer()->SendFrame(SerialNumber, ToSend.str())>0;
 	}
 } // namespace OpenWifi

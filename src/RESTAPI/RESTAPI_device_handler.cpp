@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 //	License type: BSD 3-Clause License
 //	License copy: https://github.com/Telecominfraproject/wlan-cloud-ucentralgw/blob/master/LICENSE
@@ -17,7 +22,7 @@
 
 #include "RESTAPI_device_helper.h"
 
-#include "AP_WS_Server.h"
+#include "AP_ServerProvider.h"
 
 namespace OpenWifi {
 	void RESTAPI_device_handler::DoGet() {
@@ -94,8 +99,8 @@ namespace OpenWifi {
 			return OK();
 
 		} else if (StorageService()->DeleteDevice(SerialNumber)) {
-			if(AP_WS_Server()->Connected(Utils::SerialNumberToInt(SerialNumber))) {
-				AP_WS_Server()->Disconnect(Utils::SerialNumberToInt(SerialNumber));
+			if(GetAPServer()->Connected(Utils::SerialNumberToInt(SerialNumber))) {
+				GetAPServer()->Disconnect(Utils::SerialNumberToInt(SerialNumber));
 			}
 			Logger().information(fmt::format("Successfully deleted device: [{}] of subscriber: [{}]", SerialNumber, UserInfo_.userinfo.id));
 			return OK();

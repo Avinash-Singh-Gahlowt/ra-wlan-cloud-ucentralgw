@@ -1,8 +1,14 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 // Created by stephane bourque on 2022-07-26.
 //
 
-#include "AP_WS_Connection.h"
+#include "AP_Connection.h"
+#include "AP_ServerProvider.h"
 #include "AP_WS_Server.h"
 #include "CentralConfig.h"
 #include "Daemon.h"
@@ -53,8 +59,8 @@ namespace OpenWifi {
 		}
 	}
 
-	void AP_WS_Connection::Process_connect(Poco::JSON::Object::Ptr ParamsObj,
-										   const std::string &Serial) {
+	void AP_Connection::Process_connect(Poco::JSON::Object::Ptr ParamsObj,
+										 const std::string &Serial) {
 		if (ParamsObj->has(uCentralProtocol::UUID) && ParamsObj->has(uCentralProtocol::FIRMWARE) &&
 			ParamsObj->has(uCentralProtocol::CAPABILITIES)) {
 			uint64_t UUID = ParamsObj->get(uCentralProtocol::UUID);
@@ -71,7 +77,7 @@ namespace OpenWifi {
 
 			CommandManager()->ClearQueue(SerialNumberInt_);
 
-			AP_WS_Server()->StartSession(State_.sessionId, SerialNumberInt_);
+			GetAPServer()->StartSession(State_.sessionId, SerialNumberInt_);
 
 			Config::Capabilities Caps(Capabilities);
 
@@ -80,7 +86,7 @@ namespace OpenWifi {
 			State_.UUID = UUID;
 			State_.Firmware = Firmware;
 			State_.PendingUUID = 0;
-			State_.Address = Utils::FormatIPv6(WS_->peerAddress().toString());
+			State_.Address = Address_;
 			CId_ = SerialNumber_ + "@" + CId_;
 
 			auto Platform = Poco::toLower(Caps.Platform());
@@ -251,8 +257,8 @@ namespace OpenWifi {
 
 			if (State_.VerifiedCertificate == GWObjects::VALID_CERTIFICATE) {
 				if ((Utils::SerialNumberMatch(CN_, SerialNumber_,
-											  (int)AP_WS_Server()->MismatchDepth())) ||
-					AP_WS_Server()->IsSimSerialNumber(CN_)) {
+											  (int)GetAPServer()->MismatchDepth())) ||
+					GetAPServer()->IsSimSerialNumber(CN_)) {
 					State_.VerifiedCertificate = GWObjects::VERIFIED;
 					poco_information(Logger_,
 									 fmt::format("CONNECT({}): Fully validated and authenticated "
@@ -261,7 +267,7 @@ namespace OpenWifi {
 												 State_.connectionCompletionTime));
 				} else {
 					State_.VerifiedCertificate = GWObjects::MISMATCH_SERIAL;
-					if (AP_WS_Server()->AllowSerialNumberMismatch()) {
+					if (GetAPServer()->AllowSerialNumberMismatch()) {
 						poco_information(
 							Logger_,
 							fmt::format("CONNECT({}): Serial number mismatch allowed. CN={} "

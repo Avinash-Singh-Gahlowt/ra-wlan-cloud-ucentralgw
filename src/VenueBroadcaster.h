@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 // Created by stephane bourque on 2022-07-16.
 //
@@ -7,6 +12,7 @@
 #include "Poco/Notification.h"
 #include "Poco/NotificationQueue.h"
 
+#include "AP_ServerProvider.h"
 #include "AP_WS_Server.h"
 #include "sdks/sdk_prov.h"
 
@@ -95,7 +101,7 @@ namespace OpenWifi {
 		}
 
 		inline void SendToDevice(const std::string &SerialNumber, const std::string &Payload) {
-			AP_WS_Server()->SendFrame(SerialNumber, Payload);
+			GetAPServer()->SendFrame(SerialNumber, Payload);
 		}
 
 		inline void run() final {

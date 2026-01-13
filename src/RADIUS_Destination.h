@@ -1,3 +1,8 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
 //
 // Created by stephane bourque on 2022-08-15.
 //
@@ -16,12 +21,12 @@
 #include "Poco/Net/SecureStreamSocket.h"
 #include "Poco/Net/SocketReactor.h"
 #include "Poco/TemporaryFile.h"
-
+#include "AP_WS_Server.h"
 #include "framework/MicroServiceFuncs.h"
 
 #include "fmt/format.h"
 
-#include "AP_WS_Server.h"
+#include "AP_ServerProvider.h"
 #include "RADIUS_helpers.h"
 #include <RESTObjects/RESTAPI_GWobjects.h>
 
@@ -128,7 +133,7 @@ namespace OpenWifi {
 												   P.PacketType(),
 												   P.PacketTypeToString(),
 												   NumberOfReceivedBytes));
-							AP_WS_Server()->SendRadiusAuthenticationData(SerialNumber, Buffer,
+							GetAPServer()->SendRadiusAuthenticationData(SerialNumber, Buffer,
 																		 NumberOfReceivedBytes);
 						} else if(P.IsStatusMessageReply(ReplySource)) {
 							poco_debug(Logger_,
@@ -143,7 +148,7 @@ namespace OpenWifi {
 									   fmt::format("{}: {}:{} Received {} bytes.", SerialNumber,
 												   P.PacketType(),
 												   P.PacketTypeToString(), NumberOfReceivedBytes));
-							AP_WS_Server()->SendRadiusAccountingData(SerialNumber, Buffer,
+							GetAPServer()->SendRadiusAccountingData(SerialNumber, Buffer,
 																	 NumberOfReceivedBytes);
 						} else {
 							poco_debug(Logger_, "ACCT packet dropped.");
@@ -155,7 +160,7 @@ namespace OpenWifi {
 									   fmt::format("{}: {}:{} Received {} bytes.", SerialNumber,
 												   P.PacketType(),
 												   P.PacketTypeToString(), NumberOfReceivedBytes));
-							AP_WS_Server()->SendRadiusCoAData(SerialNumber, Buffer,
+							GetAPServer()->SendRadiusCoAData(SerialNumber, Buffer,
 															  NumberOfReceivedBytes);
 						} else {
 							poco_debug(Logger_, "CoA/DM packet dropped.");
@@ -209,7 +214,7 @@ namespace OpenWifi {
 				Logger_,
 				fmt::format(
 					"Accounting Packet Response received for {}", SerialNumber ));
-			AP_WS_Server()->SendRadiusAccountingData(SerialNumber, P.Buffer(), P.Size());
+			GetAPServer()->SendRadiusAccountingData(SerialNumber, P.Buffer(), P.Size());
 		}
 
 		inline void OnAuthenticationSocketReadable(
@@ -240,7 +245,7 @@ namespace OpenWifi {
 				fmt::format(
 					"Authentication Packet received for {}, CalledStationID: {}, CallingStationID:{}",
 					SerialNumber, CalledStationID, CallingStationID));
-			AP_WS_Server()->SendRadiusAuthenticationData(SerialNumber, P.Buffer(), P.Size());
+			GetAPServer()->SendRadiusAuthenticationData(SerialNumber, P.Buffer(), P.Size());
 		}
 
 		inline void OnCoASocketReadable(
@@ -267,7 +272,7 @@ namespace OpenWifi {
 				Logger_,
 				fmt::format("CoA Packet received for {}, CalledStationID: {}, CallingStationID:{}",
 							SerialNumber, CalledStationID, CallingStationID));
-			AP_WS_Server()->SendRadiusCoAData(SerialNumber, P.Buffer(), P.Size());
+			GetAPServer()->SendRadiusCoAData(SerialNumber, P.Buffer(), P.Size());
 		}
 		
 		static inline bool IsExpired(const Poco::Crypto::X509Certificate &C) {
