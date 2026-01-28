@@ -1,0 +1,268 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0 OR LicenseRef-Commercial
+ * Copyright (c) 2025 Infernet Systems Pvt Ltd
+ * Portions copyright (c) Telecom Infra Project (TIP), BSD-3-Clause
+ */
+#include "AP_KAFKA_Server.h"
+
+#include <cctype>
+#include <sstream>
+
+#include <Poco/JSON/Object.h>
+#include <Poco/JSON/Parser.h>
+#include <Poco/String.h>
+#include <Poco/Thread.h>
+
+#include <fmt/format.h>
+
+#include "AP_KAFKA_Connection.h"
+#include "AP_ServerProvider.h"
+#include "StorageService.h"
+#include "framework/KafkaManager.h"
+#include "framework/KafkaTopics.h"
+#include "framework/MicroServiceFuncs.h"
+#include "framework/utils.h"
+
+namespace OpenWifi {
+
+	bool AP_KAFKA_Server::ValidateCertificate([[maybe_unused]] const std::string &ConnectionId,
+											 [[maybe_unused]] const Poco::Crypto::X509Certificate
+												 &Certificate) {
+		return true;
+	}
+
+	int AP_KAFKA_Server::Start() {
+
+		if (!KafkaManager()->Enabled()) {
+			poco_fatal(Logger(), "KafkaManager is disabled hence exiting............");
+			std::exit(Poco::Util::Application::EXIT_CONFIG);
+		}
+
+		if (WatcherId_ == 0) {
+			Types::TopicNotifyFunction F = [this](const std::string &Key,
+												 const std::string &Payload) {
+				this->OnKafkaMessage(Key, Payload);
+			};
+			WatcherId_ = KafkaManager()->RegisterTopicWatcher(KafkaTopics::CNC_RES, F);
+		}
+		GarbageCollectorName="KFK-Session-Janitor";
+		ReadEnvironment();
+		SetJanitor("kafka:garbage");
+		poco_information(Logger(), fmt::format("Kafka server started."));
+		return 0;
+	}
+
+	void AP_KAFKA_Server::Stop() {
+
+		poco_information(Logger(), "Stopping...");
+		Running_ = false;
+
+		GarbageCollector_.wakeUp();
+		GarbageCollector_.join();
+
+		if (WatcherId_ != 0) {
+			KafkaManager()->UnregisterTopicWatcher(KafkaTopics::CNC_RES, WatcherId_);
+			WatcherId_ = 0;
+		}
+
+		poco_information(Logger(), "Stopped...");
+	}
+
+	void AP_KAFKA_Server::OnKafkaMessage(const std::string &key, const std::string &payload) {
+		if (!Running_) {
+			return;
+		}
+		try {
+			Poco::JSON::Parser parser;
+			Poco::JSON::Object::Ptr msg;
+			msg = parser.parse(payload).extract<Poco::JSON::Object::Ptr>();
+			if (msg->has("type")) {
+				auto type = msg->get("type").toString();
+				if (type == "infra_join") {
+					return HandleInfraJoin(msg, key);
+				}
+				if (type == "infra_leave") {
+					return HandleInfraLeave(msg, key);
+				}
+				poco_warning(Logger(), fmt::format("Message Type Invalid: {}",type));
+				return;
+			}
+
+			return HandleDeviceMessage(msg, key, payload);
+		} catch (const Poco::Exception &E) {
+			Logger().log(E);
+		}
+
+	}
+
+	void AP_KAFKA_Server::HandleInfraJoin(Poco::JSON::Object::Ptr msg, const std::string &key) {
+		if (!msg->has("connect_message_payload")) {
+			poco_warning(Logger(), "Infra_join missing 'connect'.");
+			return;
+		}
+		auto ConnectPayload = msg->get("connect_message_payload").toString();
+		auto IP = msg->has("infra_public_ip") ? msg->get("infra_public_ip").toString() : "";
+		auto InfraSerial = msg->has("infra_group_infra") ? msg->get("infra_group_infra").toString() : "";
+		if(ConnectPayload.empty() || IP.empty() || InfraSerial.empty())
+		{
+			poco_warning(Logger(), fmt::format("Infra_join empty field connectPayload: {} IP: {}, InfraSerial:{}", ConnectPayload,IP,InfraSerial));
+			return;
+		}
+		Poco::JSON::Parser parser;
+		auto connectParsed = parser.parse(ConnectPayload).extract<Poco::JSON::Object::Ptr>();
+		if (!connectParsed || !connectParsed->isObject(uCentralProtocol::PARAMS)) {
+			poco_warning(Logger(), "Infra_join has invalid 'connect' payload.");
+			return;
+		}
+		auto params = connectParsed->getObject(uCentralProtocol::PARAMS);
+		if (!params->has("serial")) {
+			poco_warning(Logger(), "Infra_join connect payload missing params.serial.");
+			return;
+		}
+
+		auto serial = Poco::trim(Poco::toLower(params->get(uCentralProtocol::SERIAL).toString())); 
+		
+		if (serial.empty()){
+			poco_warning(Logger(), fmt::format("Infra_join serial empty for this IP: {}", IP));
+			return;	
+		}	
+		
+		if (!Utils::NormalizeMac(InfraSerial)) {
+			poco_warning(Logger(), fmt::format("Infra_join Invalid infra_group_infra: {}", InfraSerial));
+			return;
+		}
+
+		if(!Utils::ValidSerialNumber(serial)){
+			poco_warning(Logger(), fmt::format("Infra_join Invalid serial: {}", serial));
+			return;	
+		}
+
+		if (InfraSerial != serial) {
+			poco_warning(Logger(), fmt::format("Infra_join serial mismatch: infra='{}' connect='{}'", InfraSerial, serial));
+			return;
+		}
+		if (Connected(Utils::SerialNumberToInt(serial))) {
+			poco_information(Logger(),
+							 fmt::format("Infra_join: device already connected: {}", serial));
+			return;
+		}
+		auto sessionId = ++session_id_;
+		auto Session = std::make_shared<LockedDbSession>();
+		auto NewConnection = std::make_shared<AP_KAFKA_Connection>( Logger(), Session, sessionId);
+		AddConnection(NewConnection);
+		NewConnection->Start();
+		NewConnection->setEssentials(IP,InfraSerial);		
+		{
+			std::lock_guard G(NewConnection->ConnectionMutex_);
+			if (!NewConnection->PendingPayload_.empty()) {
+				poco_warning(Logger(),
+							 fmt::format("Infra_join overwriting pending payload for {}", serial));
+			}
+			NewConnection->PendingPayload_ = ConnectPayload;
+		}
+		NewConnection->ProcessIncomingFrame();
+		poco_information(Logger(),
+						 fmt::format("Infra_join: connected {} session={} key='{}'", serial, sessionId,
+									 key));
+	}
+
+	void AP_KAFKA_Server::HandleInfraLeave(Poco::JSON::Object::Ptr msg, const std::string &key) {
+		auto InfraSerial = msg->has("infra_group_infra") ? msg->get("infra_group_infra").toString() : "";
+		if (InfraSerial.empty()){
+			poco_warning(Logger(), fmt::format("Infra_leave serials empty"));
+			return;
+		}
+
+		if (!Utils::NormalizeMac(InfraSerial) || !Utils::ValidSerialNumber(InfraSerial)) {
+			poco_warning(Logger(), fmt::format("Invalid serial: {}", InfraSerial));
+			return;
+		}
+
+		auto serialInt = Utils::SerialNumberToInt(InfraSerial);
+		if (!Connected(serialInt)) {
+			poco_information(Logger(),
+							 fmt::format("Infra_leave: Device Not Connected: {}", InfraSerial));
+			return;
+		}
+
+		auto Conn = GetConnection(serialInt);
+		if (!Conn) {
+			poco_information(Logger(), fmt::format("Infra_leave:AP_Connection not found: {}", InfraSerial));
+			return;
+		}
+
+		Conn->EndConnection();
+		poco_information(Logger(), fmt::format("Infra_leave: disconnected {}", InfraSerial));
+	}
+
+	void AP_KAFKA_Server::HandleDeviceMessage(Poco::JSON::Object::Ptr msg, const std::string &key,
+											 const std::string &payload) {	
+		if (!msg) {
+			poco_warning(Logger(), fmt::format("Kafka msg: null JSON object. key='{}'", key));
+			return;
+		}
+
+		std::string serial;
+		if (msg->has(uCentralProtocol::METHOD)) {
+			if (Poco::trim(msg->get(uCentralProtocol::METHOD).toString()).empty()) {
+				poco_warning(Logger(), fmt::format("Missing/empty METHOD. key='{}'", key));
+				return;
+			}
+
+			Poco::JSON::Object::Ptr params;
+			if (!msg->isObject(uCentralProtocol::PARAMS) ||
+				!(params = msg->getObject(uCentralProtocol::PARAMS)) || params->size() == 0) {
+				poco_warning(Logger(), fmt::format("Missing/empty PARAMS. key='{}'", key));
+				return;
+			}
+
+			if (!params->has(uCentralProtocol::SERIAL)) {
+				poco_warning(Logger(), fmt::format("Missing PARAMS.SERIAL. key='{}'", key));
+				return;
+			}
+
+			serial = Poco::trim(Poco::toLower(params->get(uCentralProtocol::SERIAL).toString()));
+			if (serial.empty()) {
+				poco_warning(Logger(), fmt::format("Empty PARAMS.SERIAL. key='{}'", key));
+				return;
+			}
+		} else {
+			Poco::JSON::Object::Ptr result;
+			if (!msg->isObject(uCentralProtocol::RESULT) ||
+				!(result = msg->getObject(uCentralProtocol::RESULT)) || result->size() == 0) {
+				poco_warning(Logger(), fmt::format("Missing/empty RESULT. key='{}'", key));
+				return;
+			}
+			if (!result->has(uCentralProtocol::SERIAL)) {
+				poco_warning(Logger(), fmt::format("Missing RESULT.SERIAL. key='{}'", key));
+				return;
+			}
+			serial = Poco::trim(Poco::toLower(result->get(uCentralProtocol::SERIAL).toString()));
+			if (serial.empty()) {
+				poco_warning(Logger(), fmt::format("Empty RESULT.SERIAL. key='{}'", key));
+				return;
+			}
+		}
+		if (!Utils::NormalizeMac(serial) || !Utils::ValidSerialNumber(serial)) {
+			poco_warning(Logger(), fmt::format("Invalid serial: {}", serial));
+			return;
+		}
+
+		auto Conn = GetConnection(Utils::SerialNumberToInt(serial));
+		if (!Conn) {
+			poco_warning(Logger(), fmt::format("Kafka msg for non-connected device: {}", serial));
+			return;
+		}
+		auto KafkaConn = std::static_pointer_cast<AP_KAFKA_Connection>(Conn);
+		{
+			std::lock_guard G(KafkaConn->ConnectionMutex_);
+			if (!KafkaConn->PendingPayload_.empty()) {
+				poco_warning(Logger(), fmt::format("Overwriting pending payload for {}", serial));
+			}
+			KafkaConn->PendingPayload_ = payload;
+		}
+		KafkaConn->ProcessIncomingFrame();
+		}
+		
+
+	} // namespace OpenWifi

@@ -110,6 +110,7 @@ namespace OpenWifi {
 
 		friend class AP_Server;
 		friend class AP_WS_Server;
+		friend class AP_KAFKA_Server;
 
 	  protected:
 		AP_Connection(Poco::Logger &L, std::shared_ptr<LockedDbSession> session,

@@ -93,13 +93,9 @@ namespace OpenWifi {
 	}
 
 	int AP_WS_Server::Start() {
-
-		AllowSerialNumberMismatch_ =
-			MicroServiceConfigGetBool("openwifi.certificates.allowmismatch", true);
-		MismatchDepth_ = MicroServiceConfigGetInt("openwifi.certificates.mismatchdepth", 2);
-
-		SessionTimeOut_ = MicroServiceConfigGetInt("openwifi.session.timeout", 10*60);
-
+		GarbageCollectorName="WS-Session-Janitor";
+		ReadEnvironment();
+		
 		Reactor_pool_ = std::make_unique<AP_WS_ReactorThreadPool>(Logger());
 		Reactor_pool_->Start();
 
@@ -186,8 +182,6 @@ namespace OpenWifi {
 				WebServers_.push_back(std::move(NewWebServer));
 			}
 
-			KafkaDisableState_ = MicroServiceConfigGetBool("openwifi.kafka.disablestate", false);
-			KafkaDisableHealthChecks_ = MicroServiceConfigGetBool("openwifi.kafka.disablehealthchecks", false);
 		}
 
 		for (auto &server : WebServers_) {
@@ -196,34 +190,14 @@ namespace OpenWifi {
 
 		ReactorThread_.start(Reactor_);
 
-		auto ProvString = MicroServiceConfigGetString("autoprovisioning.process", "default");
-		if (ProvString != "default") {
-			auto Tokens = Poco::StringTokenizer(ProvString, ",");
-			for (const auto &i : Tokens) {
-				if (i == "prov")
-					LookAtProvisioning_ = true;
-				else
-					UseDefaultConfig_ = true;
-			}
-		} else {
-			UseDefaultConfig_ = true;
-		}
-
-		SimulatorId_ = Poco::toLower(MicroServiceConfigGetString("simulatorid", ""));
-		SimulatorEnabled_ = !SimulatorId_.empty();
 		Utils::SetThreadName(ReactorThread_, "dev:react:head");
 
-		Running_ = true;
-		GarbageCollector_.setName("ws:garbage");
-		GarbageCollector_.start(*this);
-
-		std::thread CleanupThread([this](){ CleanupSessions(); });
-		CleanupThread.detach();
+		SetJanitor("ws:garbage");
 
 		return 0;
 	}
 
-	void AP_WS_Server::run() {
+	/*void AP_WS_Server::run() {
 		uint64_t last_log = Utils::Now(),
 				 last_zombie_run = 0,
 				 last_garbage_run = 0;
@@ -398,7 +372,7 @@ namespace OpenWifi {
 		}
 		LocalLogger.information(fmt::format("Garbage collector done for the day."	));
 	}
-
+*/
 	void AP_WS_Server::Stop() {
 		poco_information(Logger(), "Stopping...");
 		Running_ = false;
