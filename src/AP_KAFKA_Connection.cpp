@@ -18,6 +18,7 @@
 #include "AP_ServerProvider.h"
 #include "StorageService.h"
 #include "framework/KafkaManager.h"
+#include "framework/KafkaTopics.h"
 #include "framework/MicroServiceFuncs.h"
 #include "framework/ow_constants.h"
 #include "framework/utils.h"
@@ -125,17 +126,76 @@ namespace OpenWifi {
 		}
 	}
 
-	void AP_KAFKA_Connection::setEssentials(const std::string &IP, const std::string &InfraSerial) {
+	void AP_KAFKA_Connection::setEssentials(const std::string &IP, const std::string &InfraSerial,
+											uint64_t InfraGroupId) {
 
 		CN_ = SerialNumber_ = InfraSerial;
 		CId_= Address_ = IP;
 		SerialNumberInt_ = Utils::SerialNumberToInt(SerialNumber_);
+		InfraGroupId_ = InfraGroupId;
 		
 	}
 
 	bool AP_KAFKA_Connection::Send(const std::string &Payload) {
-		(void)Payload;
-		return false;
+		if (!KafkaManager()->Enabled()) {
+			return false;
+		}
+
+		if (InfraGroupId_ == 0) {
+			poco_warning(Logger_, fmt::format("Kafka send skipped: infra_group_id missing for {}",
+											  SerialNumber_));
+			return false;
+		}
+
+		Poco::JSON::Object::Ptr msgObject;
+		try {
+			Poco::JSON::Parser parser;
+			msgObject = parser.parse(Payload).extract<Poco::JSON::Object::Ptr>();
+		} catch (...) {
+			poco_warning(Logger_, fmt::format("Parsing error payload while sending on kafka {}",  SerialNumber_));
+			return false;
+		}
+
+		auto commandTimeout = [](const std::string &method) -> uint64_t {
+			if (method == "configure") return 120;
+			if (method == "upgrade") return 30;
+			if (method == "reboot") return 30;
+			if (method == "factory") return 30;
+			if (method == "leds") return 120;
+			if (method == "trace") return 300;
+			if (method == "request") return 120;
+			if (method == "wifiscan") return 120;
+			if (method == "eventqueue") return 30;
+			if (method == "telemetry") return 30;
+			if (method == "ping") return 60;
+			if (method == "rrm") return 60;
+			if (method == "certupdate") return 60;
+			if (method == "transfer") return 60;
+			if (method == "script") return 60;
+			if (method == "powercycle") return 60;
+			if (method == "fixedconfig") return 120;
+			if (method == "cablediagnostics") return 120;
+			if (method == "reenroll") return 120;
+			return 120;
+		};
+
+		uint64_t timeoutSeconds = 120;
+		if (msgObject && msgObject->has(uCentralProtocol::METHOD)) {
+			timeoutSeconds = commandTimeout(msgObject->get(uCentralProtocol::METHOD).toString());
+		}
+
+		Poco::JSON::Object kafkaPayload;
+		kafkaPayload.set("type", "infrastructure_group_infra_message_enqueue");
+		kafkaPayload.set("infra_group_id", std::to_string(InfraGroupId_));
+		kafkaPayload.set("infra_group_infra", SerialNumber_);
+		kafkaPayload.set("msg", msgObject);
+		kafkaPayload.set("uuid", MicroServiceCreateUUID());
+		kafkaPayload.set("timeout", timeoutSeconds);
+
+		KafkaManager()->PostMessage(KafkaTopics::CNC, std::to_string(InfraGroupId_), kafkaPayload,false);
+		State_.TX += Payload.size();
+		GetAPServer()->AddTX(Payload.size());
+		return true;
 	}
 
 	void AP_KAFKA_Connection::EndConnection() {

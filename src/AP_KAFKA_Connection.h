@@ -30,7 +30,8 @@ namespace OpenWifi {
 		[[nodiscard]] bool ValidatedDevice() override;
 		void ProcessIncomingFrame() override;
 		[[nodiscard]] bool Send(const std::string &Payload) override;
-		void setEssentials(const std::string &IP, const std::string &InfraSerial);
+		void setEssentials(const std::string &IP, const std::string &InfraSerial,
+						   uint64_t InfraGroupId);
 
 	  private:
 		friend class AP_KAFKA_Server;

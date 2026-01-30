@@ -157,6 +157,7 @@ namespace OpenWifi {
 		bool hasGPS_ = false;
 		std::double_t memory_used_ = 0.0, cpu_load_ = 0.0, temperature_ = 0.0;
 		std::uint64_t uuid_ = 0;
+		uint64_t InfraGroupId_ = 0;
 		bool Simulated_ = false;
 		std::atomic_uint64_t LastContact_ = 0;
 

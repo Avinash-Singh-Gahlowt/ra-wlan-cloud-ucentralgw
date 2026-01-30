@@ -6,6 +6,8 @@
 #include "AP_KAFKA_Server.h"
 
 #include <cctype>
+#include <cerrno>
+#include <cstdlib>
 #include <sstream>
 
 #include <Poco/JSON/Object.h>
@@ -103,7 +105,14 @@ namespace OpenWifi {
 		auto ConnectPayload = msg->get("connect_message_payload").toString();
 		auto IP = msg->has("infra_public_ip") ? msg->get("infra_public_ip").toString() : "";
 		auto InfraSerial = msg->has("infra_group_infra") ? msg->get("infra_group_infra").toString() : "";
-		if(ConnectPayload.empty() || IP.empty() || InfraSerial.empty())
+		uint64_t InfraGroupId = 0;
+		if(!msg->has("infra_group_id")){
+			poco_warning(Logger(), fmt::format("Infra_join Group Id not found for SerialNumber {}", InfraSerial));
+			return;	
+		}
+		InfraGroupId = msg->get("infra_group_id");
+
+		if(ConnectPayload.empty() || IP.empty() || InfraSerial.empty() )
 		{
 			poco_warning(Logger(), fmt::format("Infra_join empty field connectPayload: {} IP: {}, InfraSerial:{}", ConnectPayload,IP,InfraSerial));
 			return;
@@ -151,7 +160,7 @@ namespace OpenWifi {
 		auto NewConnection = std::make_shared<AP_KAFKA_Connection>( Logger(), Session, sessionId);
 		AddConnection(NewConnection);
 		NewConnection->Start();
-		NewConnection->setEssentials(IP,InfraSerial);		
+		NewConnection->setEssentials(IP, InfraSerial, InfraGroupId);
 		{
 			std::lock_guard G(NewConnection->ConnectionMutex_);
 			if (!NewConnection->PendingPayload_.empty()) {
@@ -161,7 +170,7 @@ namespace OpenWifi {
 			NewConnection->PendingPayload_ = ConnectPayload;
 		}
 		NewConnection->ProcessIncomingFrame();
-		poco_information(Logger(),
+		poco_trace(Logger(),
 						 fmt::format("Infra_join: connected {} session={} key='{}'", serial, sessionId,
 									 key));
 	}

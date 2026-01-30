@@ -13,6 +13,7 @@ namespace OpenWifi::KafkaTopics {
 	inline const char * HEALTHCHECK = "healthcheck";
 	inline const char * STATE = "state";
 	inline const char * CONNECTION = "connection";
+	inline const char * CNC = "CnC";
 	inline const char * CNC_RES = "CnC_Res";
 	inline const char * WIFISCAN = "wifiscan";
 	inline const char * ALERTS = "alerts";
