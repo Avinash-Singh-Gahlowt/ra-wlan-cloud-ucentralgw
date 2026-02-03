@@ -218,7 +218,7 @@ namespace OpenWifi {
 		}
 	}
 
-	bool AP_Server::SendFrame(uint64_t SerialNumber, const std::string &Payload) const {
+	bool AP_Server::SendFrame(uint64_t SerialNumber, const std::string &Payload,std::chrono::milliseconds WaitTimeInMs) const {
 		auto hashIndex = MACHash::Hash(SerialNumber);
 
 		std::shared_ptr<AP_Connection> Connection;
@@ -236,7 +236,7 @@ namespace OpenWifi {
 		}
 
 		try {
-			return Connection->Send(Payload);
+			return Connection->Send(Payload,WaitTimeInMs);
 		} catch (...) {
 			poco_debug(Logger(), fmt::format(": SendFrame: Could not send data to device '{}'",
 											 Utils::IntToSerialNumber(SerialNumber)));

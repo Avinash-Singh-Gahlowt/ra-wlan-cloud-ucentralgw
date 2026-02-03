@@ -29,7 +29,7 @@ namespace OpenWifi {
 		void EndConnection() override;
 		[[nodiscard]] bool ValidatedDevice() override;
 		void ProcessIncomingFrame() override;
-		[[nodiscard]] bool Send(const std::string &Payload) override;
+		[[nodiscard]] bool Send(const std::string &Payload,std::chrono::milliseconds waitTime = std::chrono::milliseconds{30000}) override;
 		void setEssentials(const std::string &IP, const std::string &InfraSerial,
 						   uint64_t InfraGroupId);
 

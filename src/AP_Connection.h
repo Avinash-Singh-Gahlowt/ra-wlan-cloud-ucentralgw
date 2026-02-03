@@ -40,7 +40,7 @@ namespace OpenWifi {
 		virtual void EndConnection() = 0;
 		[[nodiscard]] virtual bool ValidatedDevice() = 0;
 		virtual void ProcessIncomingFrame() = 0;
-		[[nodiscard]] virtual bool Send(const std::string &Payload) = 0;
+		[[nodiscard]] virtual bool Send(const std::string &Payload,std::chrono::milliseconds WaitTimeInMs = std::chrono::milliseconds{30000}) = 0;
 
 		void ProcessJSONRPCEvent(Poco::JSON::Object::Ptr &Doc);
 		void ProcessJSONRPCResult(Poco::JSON::Object::Ptr Doc);

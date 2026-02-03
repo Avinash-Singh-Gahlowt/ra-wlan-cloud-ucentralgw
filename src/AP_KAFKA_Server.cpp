@@ -70,6 +70,119 @@ namespace OpenWifi {
 		poco_information(Logger(), "Stopped...");
 	}
 
+	bool AP_KAFKA_Server::validateMethod(Poco::JSON::Object::Ptr msg, std::string &serial,const std::string &key) {
+		if (Poco::trim(msg->get(uCentralProtocol::METHOD).toString()).empty()) {
+			poco_warning(Logger(), fmt::format("Missing/empty METHOD. key='{}'", key));
+			return false;
+		}
+
+		Poco::JSON::Object::Ptr params;
+		if (!msg->isObject(uCentralProtocol::PARAMS) ||
+			!(params = msg->getObject(uCentralProtocol::PARAMS)) || params->size() == 0) {
+			poco_warning(Logger(), fmt::format("Missing/empty PARAMS. key='{}'", key));
+			return false;
+		}
+		if (!params->has(uCentralProtocol::SERIAL)) {
+			poco_warning(Logger(), fmt::format("Missing PARAMS.SERIAL. key='{}'", key));
+			return false;
+		}
+		serial = Poco::trim(Poco::toLower(params->get(uCentralProtocol::SERIAL).toString()));
+		if (serial.empty()) {
+			poco_warning(Logger(), fmt::format("Empty PARAMS.SERIAL. key='{}'", key));
+			return false;
+		}
+		return true;
+	}
+
+	bool AP_KAFKA_Server::validateResult(Poco::JSON::Object::Ptr msg, std::string &serial,const std::string &key) {
+
+		Poco::JSON::Object::Ptr result;
+		if (!msg->isObject(uCentralProtocol::RESULT) ||
+			!(result = msg->getObject(uCentralProtocol::RESULT)) || result->size() == 0) {
+			poco_warning(Logger(), fmt::format("Missing/empty RESULT. key='{}'", key));
+			return false;
+		}
+		if (!result->has(uCentralProtocol::SERIAL)) {
+			poco_warning(Logger(), fmt::format("Missing RESULT.SERIAL. key='{}'", key));
+			return false;
+		}
+		serial = Poco::trim(Poco::toLower(result->get(uCentralProtocol::SERIAL).toString()));
+		if (serial.empty()) {
+			poco_warning(Logger(), fmt::format("Empty RESULT.SERIAL. key='{}'", key));
+			return false;
+		}
+		return true;
+	}
+
+	bool AP_KAFKA_Server::recreateConnection(std::shared_ptr<AP_KAFKA_Connection> &KafkaConn, std::string &serial) {
+
+			GWObjects::Device DeviceInfo;
+			GWObjects::Capabilities Capabilities;
+
+			auto Session = std::make_shared<LockedDbSession>();
+			if (!StorageService()->GetDevice(*Session, serial, DeviceInfo)) {
+				poco_warning(Logger(),
+							 fmt::format("Kafka msg for non-connected device: {}. Device record not found.", serial));
+				return false;
+			}
+
+			auto CapSerial = serial;
+			if (!StorageService()->GetDeviceCapabilities(CapSerial, Capabilities) ||
+				Capabilities.Capabilities.empty()) {
+				poco_warning(Logger(),
+							 fmt::format("Kafka msg for non-connected device: {}. Capabilities not found.", serial));
+				return false;
+			}
+
+			Poco::JSON::Object::Ptr CapObj;
+			try {
+				Poco::JSON::Parser capParser;
+				CapObj = capParser.parse(Capabilities.Capabilities).extract<Poco::JSON::Object::Ptr>();
+			} catch (...) {
+				poco_warning(Logger(),
+							 fmt::format("Kafka msg for non-connected device: {}. Invalid capabilities JSON in DB.",
+										 serial));
+				return false;
+			}
+
+			if (!CapObj) {
+				poco_warning(Logger(),
+							 fmt::format("Kafka msg for non-connected device: {}. Capabilities JSON missing.", serial));
+				return false;
+			}
+
+			Poco::JSON::Object ConnectObj;
+			Poco::JSON::Object Params;
+			Params.set(uCentralProtocol::SERIAL, serial);
+			Params.set(uCentralProtocol::UUID, DeviceInfo.UUID);
+			Params.set(uCentralProtocol::FIRMWARE, DeviceInfo.Firmware);
+			Params.set(uCentralProtocol::CAPABILITIES, CapObj);
+			if (!DeviceInfo.connectReason.empty()) {
+				Params.set("reason", DeviceInfo.connectReason);
+			}
+			ConnectObj.set(uCentralProtocol::JSONRPC, uCentralProtocol::JSONRPC_VERSION);
+			ConnectObj.set(uCentralProtocol::METHOD, uCentralProtocol::CONNECT);
+			ConnectObj.set(uCentralProtocol::PARAMS, Params);
+
+			std::ostringstream ConnectPayload;
+			ConnectObj.stringify(ConnectPayload);
+
+			auto sessionId = ++session_id_;
+			KafkaConn = std::make_shared<AP_KAFKA_Connection>(Logger(), Session, sessionId);
+			AddConnection(KafkaConn);
+			KafkaConn->Start();
+			KafkaConn->setEssentials("", serial, DeviceInfo.infraGroupId);
+			{
+				std::lock_guard G(KafkaConn->ConnectionMutex_);
+				KafkaConn->PendingPayload_ = ConnectPayload.str();
+			}
+			KafkaConn->ProcessIncomingFrame();
+			poco_information(Logger(),
+							 fmt::format("Kafka msg: recreated connection for {} session={},infraGroupId:{}", serial, sessionId,DeviceInfo.infraGroupId));
+			return true;
+
+	}
+
 	void AP_KAFKA_Server::OnKafkaMessage(const std::string &key, const std::string &payload) {
 		if (!Running_) {
 			return;
@@ -205,7 +318,7 @@ namespace OpenWifi {
 	}
 
 	void AP_KAFKA_Server::HandleDeviceMessage(Poco::JSON::Object::Ptr msg, const std::string &key,
-											 const std::string &payload) {	
+											 const std::string &payload) {  
 		if (!msg) {
 			poco_warning(Logger(), fmt::format("Kafka msg: null JSON object. key='{}'", key));
 			return;
@@ -213,56 +326,33 @@ namespace OpenWifi {
 
 		std::string serial;
 		if (msg->has(uCentralProtocol::METHOD)) {
-			if (Poco::trim(msg->get(uCentralProtocol::METHOD).toString()).empty()) {
-				poco_warning(Logger(), fmt::format("Missing/empty METHOD. key='{}'", key));
-				return;
-			}
 
-			Poco::JSON::Object::Ptr params;
-			if (!msg->isObject(uCentralProtocol::PARAMS) ||
-				!(params = msg->getObject(uCentralProtocol::PARAMS)) || params->size() == 0) {
-				poco_warning(Logger(), fmt::format("Missing/empty PARAMS. key='{}'", key));
+			if(!validateMethod(msg,serial,key))
 				return;
-			}
 
-			if (!params->has(uCentralProtocol::SERIAL)) {
-				poco_warning(Logger(), fmt::format("Missing PARAMS.SERIAL. key='{}'", key));
-				return;
-			}
-
-			serial = Poco::trim(Poco::toLower(params->get(uCentralProtocol::SERIAL).toString()));
-			if (serial.empty()) {
-				poco_warning(Logger(), fmt::format("Empty PARAMS.SERIAL. key='{}'", key));
-				return;
-			}
 		} else {
-			Poco::JSON::Object::Ptr result;
-			if (!msg->isObject(uCentralProtocol::RESULT) ||
-				!(result = msg->getObject(uCentralProtocol::RESULT)) || result->size() == 0) {
-				poco_warning(Logger(), fmt::format("Missing/empty RESULT. key='{}'", key));
+
+			if(!validateResult(msg,serial,key))
 				return;
-			}
-			if (!result->has(uCentralProtocol::SERIAL)) {
-				poco_warning(Logger(), fmt::format("Missing RESULT.SERIAL. key='{}'", key));
-				return;
-			}
-			serial = Poco::trim(Poco::toLower(result->get(uCentralProtocol::SERIAL).toString()));
-			if (serial.empty()) {
-				poco_warning(Logger(), fmt::format("Empty RESULT.SERIAL. key='{}'", key));
-				return;
-			}
 		}
 		if (!Utils::NormalizeMac(serial) || !Utils::ValidSerialNumber(serial)) {
 			poco_warning(Logger(), fmt::format("Invalid serial: {}", serial));
 			return;
 		}
 
-		auto Conn = GetConnection(Utils::SerialNumberToInt(serial));
+		auto serialInt = Utils::SerialNumberToInt(serial);
+		auto Conn = GetConnection(serialInt);
+		std::shared_ptr<AP_KAFKA_Connection> KafkaConn;
+
 		if (!Conn) {
 			poco_warning(Logger(), fmt::format("Kafka msg for non-connected device: {}", serial));
-			return;
+			if (!recreateConnection(KafkaConn,serial))
+				return;
+			
+		} else {
+			KafkaConn = std::static_pointer_cast<AP_KAFKA_Connection>(Conn);
 		}
-		auto KafkaConn = std::static_pointer_cast<AP_KAFKA_Connection>(Conn);
+
 		{
 			std::lock_guard G(KafkaConn->ConnectionMutex_);
 			if (!KafkaConn->PendingPayload_.empty()) {
@@ -271,6 +361,7 @@ namespace OpenWifi {
 			KafkaConn->PendingPayload_ = payload;
 		}
 		KafkaConn->ProcessIncomingFrame();
+
 		}
 		
 

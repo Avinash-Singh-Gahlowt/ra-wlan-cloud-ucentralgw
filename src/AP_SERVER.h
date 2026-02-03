@@ -101,9 +101,9 @@ namespace OpenWifi {
 			return Connected(Utils::SerialNumberToInt(SerialNumber));
 		}
 
-		bool SendFrame(uint64_t SerialNumber, const std::string &Payload) const;
-		inline bool SendFrame(const std::string &SerialNumber, const std::string &Payload) const {
-			return SendFrame(Utils::SerialNumberToInt(SerialNumber), Payload);
+		bool SendFrame(uint64_t SerialNumber, const std::string &Payload,std::chrono::milliseconds WaitTimeInMs) const;
+		inline bool SendFrame(const std::string &SerialNumber, const std::string &Payload,std::chrono::milliseconds WaitTimeInMs = std::chrono::milliseconds{30000}) const {
+			return SendFrame(Utils::SerialNumberToInt(SerialNumber), Payload,WaitTimeInMs);
 		}
 
 		[[nodiscard]] inline std::shared_ptr<AP_Connection>

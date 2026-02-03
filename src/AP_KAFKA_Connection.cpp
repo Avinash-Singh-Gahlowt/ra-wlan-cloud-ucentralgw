@@ -59,24 +59,27 @@ namespace OpenWifi {
 		if (Dead_) {
 			return;
 		}
-
+		if (!(DeviceValidated_ || ValidatedDevice())) {
+			return;
+		}
 		std::string payload;
 		{
-			std::lock_guard G(ConnectionMutex_);
-			if (PendingPayload_.empty()) {
-				return;
+			std::size_t size = 0;
+			{
+				std::lock_guard G(ConnectionMutex_);
+				if (PendingPayload_.empty()) {
+					return;
+				}
+				size = PendingPayload_.size();
+				payload = PendingPayload_;
+				PendingPayload_.clear();
 			}
 			State_.LastContact = LastContact_ = Utils::Now();
-			State_.RX += PendingPayload_.size();
-			GetAPServer()->AddRX(PendingPayload_.size());
+			State_.RX += size;
+			GetAPServer()->AddRX(size);
 			State_.MessageCount++;
-			if (!(DeviceValidated_ || ValidatedDevice())) {
-				return;
-			}
-			payload = PendingPayload_;
-			PendingPayload_.clear();
 		}
-
+	
 		bool KillConnection = false;
 
 		try {
@@ -136,11 +139,11 @@ namespace OpenWifi {
 		
 	}
 
-	bool AP_KAFKA_Connection::Send(const std::string &Payload) {
+	bool AP_KAFKA_Connection::Send(const std::string &Payload,std::chrono::milliseconds WaitTimeInMs) {
+
 		if (!KafkaManager()->Enabled()) {
 			return false;
 		}
-
 		if (InfraGroupId_ == 0) {
 			poco_warning(Logger_, fmt::format("Kafka send skipped: infra_group_id missing for {}",
 											  SerialNumber_));
@@ -156,41 +159,13 @@ namespace OpenWifi {
 			return false;
 		}
 
-		auto commandTimeout = [](const std::string &method) -> uint64_t {
-			if (method == "configure") return 120;
-			if (method == "upgrade") return 30;
-			if (method == "reboot") return 30;
-			if (method == "factory") return 30;
-			if (method == "leds") return 120;
-			if (method == "trace") return 300;
-			if (method == "request") return 120;
-			if (method == "wifiscan") return 120;
-			if (method == "eventqueue") return 30;
-			if (method == "telemetry") return 30;
-			if (method == "ping") return 60;
-			if (method == "rrm") return 60;
-			if (method == "certupdate") return 60;
-			if (method == "transfer") return 60;
-			if (method == "script") return 60;
-			if (method == "powercycle") return 60;
-			if (method == "fixedconfig") return 120;
-			if (method == "cablediagnostics") return 120;
-			if (method == "reenroll") return 120;
-			return 120;
-		};
-
-		uint64_t timeoutSeconds = 120;
-		if (msgObject && msgObject->has(uCentralProtocol::METHOD)) {
-			timeoutSeconds = commandTimeout(msgObject->get(uCentralProtocol::METHOD).toString());
-		}
-
 		Poco::JSON::Object kafkaPayload;
 		kafkaPayload.set("type", "infrastructure_group_infra_message_enqueue");
 		kafkaPayload.set("infra_group_id", std::to_string(InfraGroupId_));
 		kafkaPayload.set("infra_group_infra", SerialNumber_);
 		kafkaPayload.set("msg", msgObject);
 		kafkaPayload.set("uuid", MicroServiceCreateUUID());
-		kafkaPayload.set("timeout", timeoutSeconds);
+		kafkaPayload.set("timeout", std::chrono::duration_cast<std::chrono::seconds>(WaitTimeInMs).count());
 
 		KafkaManager()->PostMessage(KafkaTopics::CNC, std::to_string(InfraGroupId_), kafkaPayload,false);
 		State_.TX += Payload.size();

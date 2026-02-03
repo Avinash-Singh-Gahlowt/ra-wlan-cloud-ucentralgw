@@ -12,7 +12,7 @@
 #include "Poco/Thread.h"
 
 namespace OpenWifi {
-
+	class AP_KAFKA_Connection;
 	class AP_KAFKA_Server : public AP_Server {
 	  public:
 		static auto instance() {
@@ -36,6 +36,10 @@ namespace OpenWifi {
 		void HandleInfraLeave(Poco::JSON::Object::Ptr msg, const std::string &key);
 		void HandleDeviceMessage(Poco::JSON::Object::Ptr msg, const std::string &key,
 								 const std::string &payload);
+	 	bool validateResult(Poco::JSON::Object::Ptr msg, std::string &serial,const std::string &key);
+		bool validateMethod(Poco::JSON::Object::Ptr msg, std::string &serial,const std::string &key);
+		bool recreateConnection(std::shared_ptr<AP_KAFKA_Connection> &KafkaConn, std::string &serial);
+
 
 		AP_KAFKA_Server() noexcept : AP_Server("KafkaServer", "KAFKA-SERVER", "ucentral.kafka") {}
 	};
