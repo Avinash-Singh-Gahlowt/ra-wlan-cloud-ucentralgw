@@ -139,6 +139,23 @@ namespace OpenWifi {
 		
 	}
 
+	void AP_KAFKA_Connection::setRecreation(GWObjects::Device &DeviceInfo){
+			Restrictions_ = DeviceInfo.restrictionDetails;
+			Simulated_ = DeviceInfo.simulated;
+					
+			State_.UUID = DeviceInfo.UUID;
+			State_.Firmware = DeviceInfo.Firmware;
+			State_.PendingUUID = DeviceInfo.pendingUUID;
+			State_.Compatible = Compatible_ = DeviceInfo.Compatible;
+			State_.locale = DeviceInfo.locale;
+			State_.connectReason = DeviceInfo.connectReason;
+			State_.certificateExpiryDate = DeviceInfo.certificateExpiryDate;
+					
+			State_.Connected = true;
+			State_.started = State_.LastContact = LastContact_ ;
+			
+	}
+
 	bool AP_KAFKA_Connection::Send(const std::string &Payload,std::chrono::milliseconds WaitTimeInMs) {
 
 		if (!KafkaManager()->Enabled()) {

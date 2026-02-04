@@ -117,8 +117,6 @@ namespace OpenWifi {
 	bool AP_KAFKA_Server::recreateConnection(std::shared_ptr<AP_KAFKA_Connection> &KafkaConn, std::string &serial) {
 
 			GWObjects::Device DeviceInfo;
-			GWObjects::Capabilities Capabilities;
-
 			auto Session = std::make_shared<LockedDbSession>();
 			if (!StorageService()->GetDevice(*Session, serial, DeviceInfo)) {
 				poco_warning(Logger(),
@@ -126,57 +124,15 @@ namespace OpenWifi {
 				return false;
 			}
 
-			auto CapSerial = serial;
-			if (!StorageService()->GetDeviceCapabilities(CapSerial, Capabilities) ||
-				Capabilities.Capabilities.empty()) {
-				poco_warning(Logger(),
-							 fmt::format("Kafka msg for non-connected device: {}. Capabilities not found.", serial));
-				return false;
-			}
-
-			Poco::JSON::Object::Ptr CapObj;
-			try {
-				Poco::JSON::Parser capParser;
-				CapObj = capParser.parse(Capabilities.Capabilities).extract<Poco::JSON::Object::Ptr>();
-			} catch (...) {
-				poco_warning(Logger(),
-							 fmt::format("Kafka msg for non-connected device: {}. Invalid capabilities JSON in DB.",
-										 serial));
-				return false;
-			}
-
-			if (!CapObj) {
-				poco_warning(Logger(),
-							 fmt::format("Kafka msg for non-connected device: {}. Capabilities JSON missing.", serial));
-				return false;
-			}
-
-			Poco::JSON::Object ConnectObj;
-			Poco::JSON::Object Params;
-			Params.set(uCentralProtocol::SERIAL, serial);
-			Params.set(uCentralProtocol::UUID, DeviceInfo.UUID);
-			Params.set(uCentralProtocol::FIRMWARE, DeviceInfo.Firmware);
-			Params.set(uCentralProtocol::CAPABILITIES, CapObj);
-			if (!DeviceInfo.connectReason.empty()) {
-				Params.set("reason", DeviceInfo.connectReason);
-			}
-			ConnectObj.set(uCentralProtocol::JSONRPC, uCentralProtocol::JSONRPC_VERSION);
-			ConnectObj.set(uCentralProtocol::METHOD, uCentralProtocol::CONNECT);
-			ConnectObj.set(uCentralProtocol::PARAMS, Params);
-
-			std::ostringstream ConnectPayload;
-			ConnectObj.stringify(ConnectPayload);
 
 			auto sessionId = ++session_id_;
 			KafkaConn = std::make_shared<AP_KAFKA_Connection>(Logger(), Session, sessionId);
 			AddConnection(KafkaConn);
 			KafkaConn->Start();
 			KafkaConn->setEssentials("", serial, DeviceInfo.infraGroupId);
-			{
-				std::lock_guard G(KafkaConn->ConnectionMutex_);
-				KafkaConn->PendingPayload_ = ConnectPayload.str();
-			}
-			KafkaConn->ProcessIncomingFrame();
+			KafkaConn->setRecreation(DeviceInfo);
+			StartSession(sessionId, KafkaConn->SerialNumberInt_);
+
 			poco_information(Logger(),
 							 fmt::format("Kafka msg: recreated connection for {} session={},infraGroupId:{}", serial, sessionId,DeviceInfo.infraGroupId));
 			return true;
@@ -329,12 +285,11 @@ namespace OpenWifi {
 
 			if(!validateMethod(msg,serial,key))
 				return;
-
 		} else {
-
 			if(!validateResult(msg,serial,key))
 				return;
 		}
+
 		if (!Utils::NormalizeMac(serial) || !Utils::ValidSerialNumber(serial)) {
 			poco_warning(Logger(), fmt::format("Invalid serial: {}", serial));
 			return;
@@ -362,7 +317,7 @@ namespace OpenWifi {
 		}
 		KafkaConn->ProcessIncomingFrame();
 
-		}
+	}
 		
 
-	} // namespace OpenWifi
+} // namespace OpenWifi

@@ -32,6 +32,8 @@ namespace OpenWifi {
 		[[nodiscard]] bool Send(const std::string &Payload,std::chrono::milliseconds waitTime = std::chrono::milliseconds{30000}) override;
 		void setEssentials(const std::string &IP, const std::string &InfraSerial,
 						   uint64_t InfraGroupId);
+		void setRecreation(GWObjects::Device &DeviceInfo);
+
 
 	  private:
 		friend class AP_KAFKA_Server;
