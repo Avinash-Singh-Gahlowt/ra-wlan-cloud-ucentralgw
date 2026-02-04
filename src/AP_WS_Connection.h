@@ -35,7 +35,7 @@ namespace OpenWifi {
 
 		void EndConnection() override;
 		void ProcessIncomingFrame() override;
-		[[nodiscard]] bool Send(const std::string &Payload) override;
+		[[nodiscard]] bool Send(const std::string &Payload,std::chrono::milliseconds waitTime = std::chrono::milliseconds{30000}) override;
 		[[nodiscard]] bool ValidatedDevice() override;
 
 		void OnSocketReadable(const Poco::AutoPtr<Poco::Net::ReadableNotification> &pNf);
