@@ -47,7 +47,6 @@ namespace OpenWifi {
 		bool ValidateCertificate(const std::string &ConnectionId,
 								 const Poco::Crypto::X509Certificate &Certificate);
 
-	//	void run() override; // Garbage collector thread.
 		
 		[[nodiscard]] inline std::pair<std::shared_ptr<Poco::Net::SocketReactor>,
 									   std::shared_ptr<LockedDbSession>>

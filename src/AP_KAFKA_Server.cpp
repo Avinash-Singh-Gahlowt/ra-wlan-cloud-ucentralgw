@@ -5,6 +5,7 @@
  */
 #include "AP_KAFKA_Server.h"
 
+#include <algorithm>
 #include <cctype>
 #include <cerrno>
 #include <cstdlib>
@@ -12,6 +13,7 @@
 
 #include <Poco/JSON/Object.h>
 #include <Poco/JSON/Parser.h>
+#include <Poco/Environment.h>
 #include <Poco/String.h>
 #include <Poco/Thread.h>
 
@@ -49,6 +51,7 @@ namespace OpenWifi {
 		}
 		GarbageCollectorName="KFK-Session-Janitor";
 		ReadEnvironment();
+		InitDbSessions();
 		SetJanitor("kafka:garbage");
 		poco_information(Logger(), fmt::format("Kafka server started."));
 		return 0;
@@ -117,7 +120,7 @@ namespace OpenWifi {
 	bool AP_KAFKA_Server::recreateConnection(std::shared_ptr<AP_KAFKA_Connection> &KafkaConn, std::string &serial) {
 
 			GWObjects::Device DeviceInfo;
-			auto Session = std::make_shared<LockedDbSession>();
+			auto Session = NextDbSession();
 			if (!StorageService()->GetDevice(*Session, serial, DeviceInfo)) {
 				poco_warning(Logger(),
 							 fmt::format("Kafka msg for non-connected device: {}. Device record not found.", serial));
@@ -225,7 +228,7 @@ namespace OpenWifi {
 			return;
 		}
 		auto sessionId = ++session_id_;
-		auto Session = std::make_shared<LockedDbSession>();
+		auto Session = NextDbSession();
 		auto NewConnection = std::make_shared<AP_KAFKA_Connection>( Logger(), Session, sessionId);
 		AddConnection(NewConnection);
 		NewConnection->Start();
@@ -242,6 +245,30 @@ namespace OpenWifi {
 		poco_trace(Logger(),
 						 fmt::format("Infra_join: connected {} session={} key='{}'", serial, sessionId,
 									 key));
+	}
+
+	void AP_KAFKA_Server::InitDbSessions() {
+		std::uint64_t NumberOfSessions = Poco::Environment::processorCount() * 4;
+		if (NumberOfSessions == 0) {
+			NumberOfSessions = 8;
+		}
+		NumberOfSessions = std::min<std::uint64_t>(NumberOfSessions, 128);
+		DbSessions_.reserve(NumberOfSessions);
+		for (std::uint64_t i = 0; i < NumberOfSessions; ++i) {
+			DbSessions_.emplace_back(std::make_shared<LockedDbSession>());
+		}
+		poco_information(Logger(),
+						 fmt::format("Kafka DB session pool: {} sessions.", NumberOfSessions));
+	}
+
+	std::shared_ptr<LockedDbSession> AP_KAFKA_Server::NextDbSession() {
+		std::lock_guard Lock(DbSessionMutex_);
+		if (DbSessions_.empty()) {
+			DbSessions_.emplace_back(std::make_shared<LockedDbSession>());
+		}
+		NextDbSession_++;
+		NextDbSession_ %= DbSessions_.size();
+		return DbSessions_[NextDbSession_];
 	}
 
 	void AP_KAFKA_Server::HandleInfraLeave(Poco::JSON::Object::Ptr msg, const std::string &key) {
