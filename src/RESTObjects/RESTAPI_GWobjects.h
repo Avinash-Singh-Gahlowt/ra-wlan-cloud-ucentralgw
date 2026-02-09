@@ -105,6 +105,7 @@ namespace OpenWifi::GWObjects {
 		std::string DevicePassword;
 		std::string subscriber;
 		std::string entity;
+		uint64_t infraGroupId = 0;
 		uint64_t modified = 0;
 		std::string locale;
 		bool restrictedDevice = false;
